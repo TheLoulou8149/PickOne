@@ -2,7 +2,8 @@ import axios from 'axios';
 
 const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
-const LLM_PROVIDER = (process.env.EXPO_PUBLIC_LLM_PROVIDER ?? 'anthropic') as 'anthropic' | 'openai';
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+const LLM_PROVIDER = (process.env.EXPO_PUBLIC_LLM_PROVIDER ?? 'gemini') as 'gemini' | 'anthropic' | 'openai';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -92,6 +93,8 @@ Génère une analyse finale. Réponds UNIQUEMENT avec un objet JSON valide :
 
 // ─── API calls ────────────────────────────────────────────────────────────────
 
+const AXIOS_TIMEOUT = 15000; // 15 s
+
 async function callAnthropic(prompt: string): Promise<string> {
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
@@ -101,6 +104,7 @@ async function callAnthropic(prompt: string): Promise<string> {
       messages: [{ role: 'user', content: prompt }],
     },
     {
+      timeout: AXIOS_TIMEOUT,
       headers: {
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
@@ -121,6 +125,7 @@ async function callOpenAI(prompt: string): Promise<string> {
       response_format: { type: 'json_object' },
     },
     {
+      timeout: AXIOS_TIMEOUT,
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
         'content-type': 'application/json',
@@ -130,17 +135,50 @@ async function callOpenAI(prompt: string): Promise<string> {
   return response.data.choices[0].message.content;
 }
 
+async function callGemini(prompt: string): Promise<string> {
+  const response = await axios.post(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 512 },
+    },
+    { timeout: AXIOS_TIMEOUT, headers: { 'content-type': 'application/json' } }
+  );
+  return response.data.candidates[0].content.parts[0].text;
+}
+
 async function callLLM(prompt: string): Promise<string> {
-  if (LLM_PROVIDER === 'openai') {
-    return callOpenAI(prompt);
-  }
-  return callAnthropic(prompt);
+  if (LLM_PROVIDER === 'openai') return callOpenAI(prompt);
+  if (LLM_PROVIDER === 'anthropic') return callAnthropic(prompt);
+  return callGemini(prompt);
 }
 
 function parseJSON<T>(raw: string): T {
   // Strip markdown code fences if present
   const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
   return JSON.parse(cleaned) as T;
+}
+
+function buildDirectPrompt(ctx: ConversationContext): string {
+  return `Tu es un expert en prise de décision rationnelle et émotionnelle. Analyse ce dilemme et donne une recommandation claire.
+
+DILEMME : "${ctx.dilemma}"
+OPTION A : "${ctx.optionA}"
+OPTION B : "${ctx.optionB}"
+
+Réponds UNIQUEMENT avec un objet JSON valide, sans markdown :
+{
+  "recommendation": "${ctx.optionA} ou ${ctx.optionB} (écris exactement le nom de l'option choisie)",
+  "reasoning": "Explication en 2-3 phrases empathiques et bien argumentées",
+  "biasAlerts": [
+    {
+      "type": "status_quo | loss_aversion | social_pressure | short_term",
+      "label": "Nom court du biais potentiel",
+      "description": "Explication courte et personnalisée",
+      "severity": "low | medium | high"
+    }
+  ]
+}`;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -167,6 +205,14 @@ export async function getFullAnalysis(
     emotionalScoreA,
     emotionalScoreB
   );
+  const raw = await callLLM(prompt);
+  return parseJSON<LLMAnalysisResponse>(raw);
+}
+
+export async function getDirectRecommendation(
+  ctx: Omit<ConversationContext, 'previousQA'>
+): Promise<LLMAnalysisResponse> {
+  const prompt = buildDirectPrompt({ ...ctx, previousQA: [] });
   const raw = await callLLM(prompt);
   return parseJSON<LLMAnalysisResponse>(raw);
 }

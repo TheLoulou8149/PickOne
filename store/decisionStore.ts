@@ -58,8 +58,13 @@ export interface DecisionState {
   regretRiskA: number;        // 0–100: risk of regret if choosing A
   regretRiskB: number;        // 0–100: risk of regret if choosing B
 
+  // Direct result (home → result sans questions)
+  directRecommendation: string;
+  directReasoning: string;
+
   // ─── Actions ─────────────────────────────────────────────────────────────
   setDilemma: (dilemma: string, optionA: string, optionB: string) => void;
+  setDirectResult: (recommendation: string, reasoning: string, biases: BiasAlert[]) => void;
   addCriterion: (criterion: Omit<Criterion, 'id'>) => void;
   updateCriterion: (id: string, updates: Partial<Criterion>) => void;
   removeCriterion: (id: string) => void;
@@ -218,6 +223,8 @@ export const useDecisionStore = create<DecisionState>((set, get) => ({
   biasAlerts: [],
   isLoading: false,
   phase: 'input',
+  directRecommendation: '',
+  directReasoning: '',
 
   // Computed (will be recalculated by computeScores)
   mathematicalScoreA: 5,
@@ -229,6 +236,9 @@ export const useDecisionStore = create<DecisionState>((set, get) => ({
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   setDilemma: (dilemma, optionA, optionB) => set({ dilemma, optionA, optionB }),
+
+  setDirectResult: (directRecommendation, directReasoning, biasAlerts) =>
+    set({ directRecommendation, directReasoning, biasAlerts }),
 
   addCriterion: (criterion) =>
     set((state) => ({
@@ -305,6 +315,8 @@ export const useDecisionStore = create<DecisionState>((set, get) => ({
       biasAlerts: [],
       isLoading: false,
       phase: 'input',
+      directRecommendation: '',
+      directReasoning: '',
       mathematicalScoreA: 5,
       mathematicalScoreB: 5,
       coherenceScore: 50,

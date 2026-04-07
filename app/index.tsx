@@ -1,25 +1,47 @@
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { GitFork } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
+import { getDirectRecommendation } from '@/services/llmService';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { setDilemma, reset } = useDecisionStore();
+  const { setDilemma, setDirectResult, reset, computeScores } = useDecisionStore();
 
   const [dilemma, setDilemmaText] = useState('');
   const [optionA, setOptionA] = useState('');
   const [optionB, setOptionB] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const canContinue = dilemma.trim().length > 5 && optionA.trim().length > 0 && optionB.trim().length > 0;
+  const canContinue = dilemma.trim().length > 0 && optionA.trim().length > 0 && optionB.trim().length > 0;
 
-  function handleStart() {
-    if (!canContinue) return;
+  async function handleStart() {
+    setErrorMsg('');
+    if (isLoading) return;
+    if (!canContinue) {
+      setErrorMsg('Remplis le dilemme et les deux options.');
+      return;
+    }
     reset();
-    setDilemma(dilemma.trim(), optionA.trim(), optionB.trim());
-    router.push('/dilemma');
+    const d = dilemma.trim();
+    const a = optionA.trim();
+    const b = optionB.trim();
+    setDilemma(d, a, b);
+    setIsLoading(true);
+    try {
+      const result = await getDirectRecommendation({ dilemma: d, optionA: a, optionB: b });
+      setDirectResult(result.recommendation, result.reasoning, (result.biasAlerts as any) ?? []);
+      computeScores();
+      router.push('/result');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Erreur inconnue';
+      setErrorMsg(`Erreur API : ${msg}`);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
@@ -81,15 +103,20 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
+
         {/* CTA */}
-        <TouchableOpacity
-          style={[styles.button, !canContinue && styles.buttonDisabled]}
+        <Pressable
+          style={({ pressed }) => [styles.button, (isLoading || pressed) && styles.buttonDisabled]}
           onPress={handleStart}
-          activeOpacity={0.8}
-          disabled={!canContinue}
+          disabled={isLoading}
         >
-          <Text style={styles.buttonText}>Analyser mon choix →</Text>
-        </TouchableOpacity>
+          {isLoading ? (
+            <ActivityIndicator color={Colors.textPrimary} />
+          ) : (
+            <Text style={styles.buttonText}>Analyser mon choix →</Text>
+          )}
+        </Pressable>
 
         <Text style={styles.hint}>
           Powered par l'IA · Analyse en 2 min
@@ -189,5 +216,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: Typography.fontSizeXS,
     color: Colors.textMuted,
+  },
+  error: {
+    color: '#FF6B6B',
+    fontSize: Typography.fontSizeSM,
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
   },
 });

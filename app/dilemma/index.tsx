@@ -9,7 +9,10 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MotiView, AnimatePresence } from 'moti';
+import React from 'react';
+const MotiView = ({ children, style, from: _f, animate: _a, exit: _e, transition: _t, ...rest }: any) =>
+  <View style={style} {...rest}>{children}</View>;
+const AnimatePresence = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 import { ChevronRight, Brain } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';

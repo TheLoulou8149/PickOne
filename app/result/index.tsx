@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { MotiView, AnimatePresence } from 'moti';
+import React from 'react';
+const MotiView = ({ children, style, from: _f, animate: _a, exit: _e, transition: _t, ...rest }: any) =>
+  <View style={style} {...rest}>{children}</View>;
+const AnimatePresence = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 import { AlertTriangle, TrendingUp, Heart, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
-import { getFullAnalysis } from '@/services/llmService';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -151,53 +153,12 @@ const biasStyles = StyleSheet.create({
 export default function ResultScreen() {
   const router = useRouter();
   const store = useDecisionStore();
-  const [llmReasoning, setLlmReasoning] = useState('');
-  const [llmRecommendation, setLlmRecommendation] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(true);
 
-  useEffect(() => {
-    runAnalysis();
-  }, []);
+  const llmRecommendation = store.directRecommendation;
+  const llmReasoning = store.directReasoning;
+  const isAnalyzing = false;
 
-  async function runAnalysis() {
-    store.computeScores();
-    setIsAnalyzing(true);
-
-    try {
-      const previousQA = store.questions
-        .filter((q) => q.answer)
-        .map((q) => ({ question: q.question, answer: q.answer! }));
-
-      const result = await getFullAnalysis(
-        { dilemma: store.dilemma, optionA: store.optionA, optionB: store.optionB, previousQA },
-        store.mathematicalScoreA,
-        store.mathematicalScoreB,
-        store.emotionalScoreA,
-        store.emotionalScoreB
-      );
-
-      if (result.biasAlerts?.length) {
-        store.setBiasAlerts(result.biasAlerts as any);
-      }
-      store.computeScores(); // recompute with LLM biases added
-
-      setLlmRecommendation(result.recommendation);
-      setLlmReasoning(result.reasoning);
-    } catch {
-      const winner =
-        store.mathematicalScoreA >= store.mathematicalScoreB ? store.optionA : store.optionB;
-      setLlmRecommendation(winner);
-      setLlmReasoning("Basé sur ton analyse multi-critères, cette option score mieux globalement.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }
-
-  const winnerIsA =
-    llmRecommendation.toLowerCase().includes('option a') ||
-    llmRecommendation === store.optionA;
-
-  const winnerName = winnerIsA ? store.optionA : store.optionB;
+  const winnerName = llmRecommendation;
 
   const mathScoreColor = (score: number) =>
     score >= 7 ? Colors.scoreHigh : score >= 5 ? Colors.scoreMid : Colors.scoreLow;

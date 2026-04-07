@@ -5,3 +5,8 @@
 expo-env.d.ts
 # @end expo-cli
 node_modules/
+
+# Environment variables — NE JAMAIS COMMITTER
+.env
+.env.local
+.env.*.local
