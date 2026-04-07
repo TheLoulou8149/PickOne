@@ -137,7 +137,7 @@ async function callOpenAI(prompt: string): Promise<string> {
 
 async function callGemini(prompt: string): Promise<string> {
   const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`,
     {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { maxOutputTokens: 512 },
@@ -147,10 +147,23 @@ async function callGemini(prompt: string): Promise<string> {
   return response.data.candidates[0].content.parts[0].text;
 }
 
-async function callLLM(prompt: string): Promise<string> {
-  if (LLM_PROVIDER === 'openai') return callOpenAI(prompt);
-  if (LLM_PROVIDER === 'anthropic') return callAnthropic(prompt);
-  return callGemini(prompt);
+async function callLLM(prompt: string, attempt = 0): Promise<string> {
+  try {
+    if (LLM_PROVIDER === 'openai') return await callOpenAI(prompt);
+    if (LLM_PROVIDER === 'anthropic') return await callAnthropic(prompt);
+    return await callGemini(prompt);
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 429 && attempt < 2) {
+      // Extract retry delay from Gemini error message, default 5s
+      const raw: string = err?.response?.data?.error?.message ?? '';
+      const match = raw.match(/retry in ([\d.]+)s/);
+      const delay = match ? Math.ceil(parseFloat(match[1])) * 1000 : 5000;
+      await new Promise(res => setTimeout(res, delay));
+      return callLLM(prompt, attempt + 1);
+    }
+    throw err;
+  }
 }
 
 function parseJSON<T>(raw: string): T {

@@ -19,6 +19,7 @@ export default function HomeScreen() {
   const canContinue = dilemma.trim().length > 0 && optionA.trim().length > 0 && optionB.trim().length > 0;
 
   async function handleStart() {
+    console.log('[PickOne] bouton pressé');
     setErrorMsg('');
     if (isLoading) return;
     if (!canContinue) {
