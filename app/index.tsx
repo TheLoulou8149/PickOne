@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { MotiView } from 'moti';
 import { GitFork } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
@@ -34,12 +33,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Logo / Header */}
-        <MotiView
-          from={{ opacity: 0, translateY: -20 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 600 }}
-          style={styles.header}
-        >
+        <View style={styles.header}>
           <View style={styles.iconContainer}>
             <GitFork size={28} color={Colors.primary} strokeWidth={2.5} />
           </View>
@@ -47,15 +41,10 @@ export default function HomeScreen() {
           <Text style={styles.subtitle}>
             Décide mieux. Regrette moins.
           </Text>
-        </MotiView>
+        </View>
 
         {/* Form */}
-        <MotiView
-          from={{ opacity: 0, translateY: 30 }}
-          animate={{ opacity: 1, translateY: 0 }}
-          transition={{ type: 'timing', duration: 600, delay: 200 }}
-          style={styles.form}
-        >
+        <View style={styles.form}>
           <Text style={styles.label}>Ton dilemme</Text>
           <TextInput
             style={styles.input}
@@ -90,23 +79,17 @@ export default function HomeScreen() {
               />
             </View>
           </View>
-        </MotiView>
+        </View>
 
         {/* CTA */}
-        <MotiView
-          from={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: 'timing', duration: 400, delay: 400 }}
+        <TouchableOpacity
+          style={[styles.button, !canContinue && styles.buttonDisabled]}
+          onPress={handleStart}
+          activeOpacity={0.8}
+          disabled={!canContinue}
         >
-          <TouchableOpacity
-            style={[styles.button, !canContinue && styles.buttonDisabled]}
-            onPress={handleStart}
-            activeOpacity={0.8}
-            disabled={!canContinue}
-          >
-            <Text style={styles.buttonText}>Analyser mon choix →</Text>
-          </TouchableOpacity>
-        </MotiView>
+          <Text style={styles.buttonText}>Analyser mon choix →</Text>
+        </TouchableOpacity>
 
         <Text style={styles.hint}>
           Powered par l'IA · Analyse en 2 min
