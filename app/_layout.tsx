@@ -22,9 +22,9 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
-        <Stack.Screen name="dilemma/index" />
+        <Stack.Screen name="dilemma" />
         <Stack.Screen
-          name="result/index"
+          name="result"
           options={{ animation: 'fade' }}
         />
       </Stack>
