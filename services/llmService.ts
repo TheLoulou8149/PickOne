@@ -9,12 +9,39 @@ const TIMEOUT = 30000;
 // ─── JSON parsing robuste (depuis la spec PDF) ────────────────────────────────
 
 function parseResponse<T>(raw: string): T {
-  let s = raw.trim();
-  const m = s.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (m) s = m[1].trim();
-  const a = s.indexOf('{');
-  const b = s.lastIndexOf('}');
-  if (a > -1 && b > a) s = s.slice(a, b + 1);
+  // Strip BOM and leading/trailing whitespace
+  let s = raw.replace(/^\uFEFF/, '').trim();
+
+  // Extract from markdown code block (case-insensitive language tag: ```json, ```JSON, ```, etc.)
+  const codeBlock = s.match(/```(?:[a-zA-Z]*)?\s*([\s\S]*?)```/);
+  if (codeBlock) s = codeBlock[1].trim();
+
+  // Find start of JSON object
+  const start = s.indexOf('{');
+  if (start === -1) return JSON.parse(s) as T;
+
+  // Walk forward with bracket matching to find the correct closing }
+  // (avoids lastIndexOf picking up a } in trailing text like "for {Option B}")
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let end = -1;
+
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\' && inString) { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+
+  if (end !== -1) s = s.slice(start, end + 1);
+
   return JSON.parse(s) as T;
 }
 
