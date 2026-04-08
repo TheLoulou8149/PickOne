@@ -1,45 +1,50 @@
-import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { GitFork } from 'lucide-react-native';
+import { Zap } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
-import { getDirectRecommendation } from '@/services/llmService';
+import { callAppel1 } from '@/services/llmService';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { setDilemma, setDirectResult, reset, computeScores } = useDecisionStore();
+  const { setAppel1Result, reset } = useDecisionStore();
 
-  const [dilemma, setDilemmaText] = useState('');
-  const [optionA, setOptionA] = useState('');
-  const [optionB, setOptionB] = useState('');
+  const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [error, setError] = useState('');
 
-  const canContinue = dilemma.trim().length > 0 && optionA.trim().length > 0 && optionB.trim().length > 0;
+  const canStart = text.trim().length > 20;
 
-  async function handleStart() {
-    console.log('[PickOne] bouton pressé');
-    setErrorMsg('');
-    if (isLoading) return;
-    if (!canContinue) {
-      setErrorMsg('Remplis le dilemme et les deux options.');
-      return;
-    }
+  async function handleAnalyse() {
+    if (!canStart || isLoading) return;
+    setError('');
     reset();
-    const d = dilemma.trim();
-    const a = optionA.trim();
-    const b = optionB.trim();
-    setDilemma(d, a, b);
     setIsLoading(true);
     try {
-      const result = await getDirectRecommendation({ dilemma: d, optionA: a, optionB: b });
-      setDirectResult(result.recommendation, result.reasoning, (result.biasAlerts as any) ?? []);
-      computeScores();
-      router.push('/result');
+      const result = await callAppel1(text.trim());
+      setAppel1Result({
+        originalText: text.trim(),
+        optionALabel: result.option_a_label,
+        optionBLabel: result.option_b_label,
+        contextSummary: result.context_summary,
+        questions: result.questions,
+        instinctQuestionId: result.instinct_question_id,
+      });
+      router.push('/dilemma');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Erreur inconnue';
-      setErrorMsg(`Erreur API : ${msg}`);
+      setError(`Erreur : ${msg}`);
     } finally {
       setIsLoading(false);
     }
@@ -55,73 +60,60 @@ export default function HomeScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Logo / Header */}
+        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.iconContainer}>
-            <GitFork size={28} color={Colors.primary} strokeWidth={2.5} />
+          <View style={styles.iconWrap}>
+            <Zap size={26} color={Colors.primary} strokeWidth={2.5} />
           </View>
-          <Text style={styles.title}>PickOne</Text>
-          <Text style={styles.subtitle}>
-            Décide mieux. Regrette moins.
-          </Text>
+          <Text style={styles.appName}>PickOne</Text>
+          <Text style={styles.tagline}>Décide mieux. Regrette moins.</Text>
         </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          <Text style={styles.label}>Ton dilemme</Text>
+        {/* Card principale */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Décris ta situation</Text>
+          <Text style={styles.cardHint}>
+            Plus tu es précis (chiffres, noms, dates), plus l'analyse sera juste.
+          </Text>
+
           <TextInput
-            style={styles.input}
-            placeholder="Ex : Stage A chez une startup vs. Stage B en grand groupe"
+            style={styles.textarea}
+            placeholder={`Ex : J'hésite entre rester dans mon CDI à 42k€ ou rejoindre la startup de mon ami — ils proposent 38k€ mais avec des parts. Ma copine préfère que je reste stable, mais moi j'ai envie de tenter le coup avant 30 ans...`}
             placeholderTextColor={Colors.textMuted}
-            value={dilemma}
-            onChangeText={setDilemmaText}
+            value={text}
+            onChangeText={setText}
             multiline
-            numberOfLines={3}
             textAlignVertical="top"
           />
 
-          <View style={styles.optionsRow}>
-            <View style={styles.optionField}>
-              <Text style={styles.label}>Option A</Text>
-              <TextInput
-                style={[styles.input, styles.optionInput]}
-                placeholder="Startup"
-                placeholderTextColor={Colors.textMuted}
-                value={optionA}
-                onChangeText={setOptionA}
-              />
-            </View>
-            <View style={styles.optionField}>
-              <Text style={styles.label}>Option B</Text>
-              <TextInput
-                style={[styles.input, styles.optionInput]}
-                placeholder="Grand groupe"
-                placeholderTextColor={Colors.textMuted}
-                value={optionB}
-                onChangeText={setOptionB}
-              />
-            </View>
+          <View style={styles.charRow}>
+            <Text style={[styles.charCount, text.length < 20 && styles.charCountWarn]}>
+              {text.length} caractères {text.length < 20 ? '(min. 20)' : '✓'}
+            </Text>
           </View>
         </View>
 
-        {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        {/* CTA */}
         <Pressable
-          style={({ pressed }) => [styles.button, (isLoading || pressed) && styles.buttonDisabled]}
-          onPress={handleStart}
-          disabled={isLoading}
+          style={({ pressed }) => [
+            styles.button,
+            (!canStart || isLoading || pressed) && styles.buttonDim,
+          ]}
+          onPress={handleAnalyse}
+          disabled={!canStart || isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color={Colors.textPrimary} />
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.buttonText}>Analyse en cours…</Text>
+            </View>
           ) : (
-            <Text style={styles.buttonText}>Analyser mon choix →</Text>
+            <Text style={styles.buttonText}>Analyser ma situation →</Text>
           )}
         </Pressable>
 
-        <Text style={styles.hint}>
-          Powered par l'IA · Analyse en 2 min
-        </Text>
+        <Text style={styles.footer}>3 étapes · ~2 min · Analyse IA complète</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -135,93 +127,109 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing['3xl'],
+    paddingTop: 72,
     paddingBottom: Spacing['2xl'],
-    justifyContent: 'center',
   },
   header: {
     alignItems: 'center',
     marginBottom: Spacing['2xl'],
   },
-  iconContainer: {
-    width: 56,
-    height: 56,
+  iconWrap: {
+    width: 52,
+    height: 52,
     borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.primary + '1A',
+    borderWidth: 1,
+    borderColor: Colors.primary + '50',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.primary + '40',
   },
-  title: {
+  appName: {
     fontSize: Typography.fontSize3XL,
     fontWeight: Typography.fontWeightBlack,
     color: Colors.textPrimary,
-    letterSpacing: -1,
+    letterSpacing: -1.5,
   },
-  subtitle: {
-    fontSize: Typography.fontSizeMD,
-    color: Colors.textSecondary,
-    marginTop: Spacing.xs,
-  },
-  form: {
-    marginBottom: Spacing.xl,
-    gap: Spacing.md,
-  },
-  label: {
+  tagline: {
     fontSize: Typography.fontSizeSM,
-    fontWeight: Typography.fontWeightSemiBold,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: Colors.textMuted,
+    marginTop: Spacing.xs,
+    letterSpacing: 0.3,
   },
-  input: {
+  card: {
     backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  cardTitle: {
+    fontSize: Typography.fontSizeLG,
+    fontWeight: Typography.fontWeightBold,
+    color: Colors.textPrimary,
+  },
+  cardHint: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textMuted,
+    lineHeight: Typography.fontSizeSM * 1.6,
+  },
+  textarea: {
+    backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: BorderRadius.md,
     color: Colors.textPrimary,
     fontSize: Typography.fontSizeMD,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm + 4,
-    minHeight: 48,
+    paddingVertical: Spacing.md,
+    minHeight: 160,
+    marginTop: Spacing.xs,
   },
-  optionsRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
+  charRow: {
+    alignItems: 'flex-end',
   },
-  optionField: {
-    flex: 1,
+  charCount: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.success,
   },
-  optionInput: {
-    minHeight: 48,
+  charCountWarn: {
+    color: Colors.textMuted,
+  },
+  errorText: {
+    color: Colors.danger,
+    fontSize: Typography.fontSizeSM,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
   },
   button: {
     backgroundColor: Colors.primary,
     borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.md + 2,
     alignItems: 'center',
     marginBottom: Spacing.md,
   },
-  buttonDisabled: {
-    opacity: 0.4,
+  buttonDim: {
+    opacity: 0.45,
   },
   buttonText: {
-    color: Colors.textPrimary,
+    color: '#fff',
     fontSize: Typography.fontSizeLG,
     fontWeight: Typography.fontWeightBold,
+    letterSpacing: 0.2,
   },
-  hint: {
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  footer: {
     textAlign: 'center',
     fontSize: Typography.fontSizeXS,
     color: Colors.textMuted,
-  },
-  error: {
-    color: '#FF6B6B',
-    fontSize: Typography.fontSizeSM,
-    textAlign: 'center',
-    marginBottom: Spacing.sm,
+    letterSpacing: 0.3,
   },
 });

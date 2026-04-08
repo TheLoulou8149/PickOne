@@ -1,110 +1,38 @@
 import axios from 'axios';
+import type { Question, Criterion, Analysis } from '@/store/decisionStore';
 
 const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 const LLM_PROVIDER = (process.env.EXPO_PUBLIC_LLM_PROVIDER ?? 'gemini') as 'gemini' | 'anthropic' | 'openai';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const TIMEOUT = 30000;
 
-export interface LLMQuestionResponse {
-  nextQuestion: string;
-  detectedBiases: string[];
-  questionCategory: 'objective' | 'constraint' | 'emotion';
+// ─── JSON parsing robuste (depuis la spec PDF) ────────────────────────────────
+
+function parseResponse<T>(raw: string): T {
+  let s = raw.trim();
+  const m = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (m) s = m[1].trim();
+  const a = s.indexOf('{');
+  const b = s.lastIndexOf('}');
+  if (a > -1 && b > a) s = s.slice(a, b + 1);
+  return JSON.parse(s) as T;
 }
 
-export interface LLMAnalysisResponse {
-  biasAlerts: {
-    type: string;
-    label: string;
-    description: string;
-    severity: 'low' | 'medium' | 'high';
-  }[];
-  recommendation: string;
-  reasoning: string;
-}
+// ─── Appels API par provider ──────────────────────────────────────────────────
 
-interface ConversationContext {
-  dilemma: string;
-  optionA: string;
-  optionB: string;
-  previousQA: { question: string; answer: string }[];
-}
-
-// ─── Prompt builders ──────────────────────────────────────────────────────────
-
-function buildQuestionPrompt(ctx: ConversationContext): string {
-  const qa = ctx.previousQA
-    .map((item) => `Q: ${item.question}\nR: ${item.answer}`)
-    .join('\n\n');
-
-  return `Tu es un expert en prise de décision et psychologie cognitive. L'utilisateur fait face au dilemme suivant :
-
-DILEMME : "${ctx.dilemma}"
-OPTION A : "${ctx.optionA}"
-OPTION B : "${ctx.optionB}"
-
-${ctx.previousQA.length > 0 ? `Questions et réponses précédentes :\n${qa}\n\n` : ''}
-
-Génère la PROCHAINE question la plus pertinente pour mieux comprendre les priorités, contraintes ou ressentis de l'utilisateur.
-
-Réponds UNIQUEMENT avec un objet JSON valide, sans markdown, sans explication :
-{
-  "nextQuestion": "Ta question ici (max 2 phrases, naturelle et empathique)",
-  "detectedBiases": ["liste des biais détectés jusqu'ici, ou tableau vide"],
-  "questionCategory": "objective | constraint | emotion"
-}`;
-}
-
-function buildAnalysisPrompt(
-  ctx: ConversationContext,
-  mathematicalScoreA: number,
-  mathematicalScoreB: number,
-  emotionalScoreA: number,
-  emotionalScoreB: number
-): string {
-  const qa = ctx.previousQA
-    .map((item) => `Q: ${item.question}\nR: ${item.answer}`)
-    .join('\n\n');
-
-  return `Tu es un expert en décision rationnelle et émotionnelle. Analyse ce dilemme :
-
-DILEMME : "${ctx.dilemma}"
-OPTION A : "${ctx.optionA}" — Score rationnel : ${mathematicalScoreA}/10, Score émotionnel : ${emotionalScoreA}/100
-OPTION B : "${ctx.optionB}" — Score rationnel : ${mathematicalScoreB}/10, Score émotionnel : ${emotionalScoreB}/100
-
-Réponses de l'utilisateur :
-${qa}
-
-Génère une analyse finale. Réponds UNIQUEMENT avec un objet JSON valide :
-{
-  "biasAlerts": [
-    {
-      "type": "status_quo | loss_aversion | social_pressure | short_term",
-      "label": "Nom court du biais",
-      "description": "Explication personnalisée basée sur les réponses (1-2 phrases)",
-      "severity": "low | medium | high"
-    }
-  ],
-  "recommendation": "Option A | Option B",
-  "reasoning": "Explication de la recommandation en 2-3 phrases, empathique et argumentée"
-}`;
-}
-
-// ─── API calls ────────────────────────────────────────────────────────────────
-
-const AXIOS_TIMEOUT = 15000; // 15 s
-
-async function callAnthropic(prompt: string): Promise<string> {
+async function callAnthropic(systemPrompt: string, userMessage: string): Promise<string> {
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
-      model: 'claude-3-haiku-20240307',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
     },
     {
-      timeout: AXIOS_TIMEOUT,
+      timeout: TIMEOUT,
       headers: {
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
@@ -115,17 +43,20 @@ async function callAnthropic(prompt: string): Promise<string> {
   return response.data.content[0].text;
 }
 
-async function callOpenAI(prompt: string): Promise<string> {
+async function callOpenAI(systemPrompt: string, userMessage: string): Promise<string> {
   const response = await axios.post(
     'https://api.openai.com/v1/chat/completions',
     {
       model: 'gpt-4o-mini',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
       response_format: { type: 'json_object' },
     },
     {
-      timeout: AXIOS_TIMEOUT,
+      timeout: TIMEOUT,
       headers: {
         Authorization: `Bearer ${OPENAI_API_KEY}`,
         'content-type': 'application/json',
@@ -135,97 +66,239 @@ async function callOpenAI(prompt: string): Promise<string> {
   return response.data.choices[0].message.content;
 }
 
-async function callGemini(prompt: string): Promise<string> {
+async function callGemini(systemPrompt: string, userMessage: string): Promise<string> {
   const response = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`,
     {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 512 },
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ parts: [{ text: userMessage }] }],
+      generationConfig: { maxOutputTokens: 2000 },
     },
-    { timeout: AXIOS_TIMEOUT, headers: { 'content-type': 'application/json' } }
+    { timeout: TIMEOUT, headers: { 'content-type': 'application/json' } }
   );
   return response.data.candidates[0].content.parts[0].text;
 }
 
-async function callLLM(prompt: string, attempt = 0): Promise<string> {
+async function callLLM(systemPrompt: string, userMessage: string, attempt = 0): Promise<string> {
   try {
-    if (LLM_PROVIDER === 'openai') return await callOpenAI(prompt);
-    if (LLM_PROVIDER === 'anthropic') return await callAnthropic(prompt);
-    return await callGemini(prompt);
+    if (LLM_PROVIDER === 'anthropic') return await callAnthropic(systemPrompt, userMessage);
+    if (LLM_PROVIDER === 'openai') return await callOpenAI(systemPrompt, userMessage);
+    return await callGemini(systemPrompt, userMessage);
   } catch (err: any) {
     const status = err?.response?.status;
     if (status === 429 && attempt < 2) {
-      // Extract retry delay from Gemini error message, default 5s
       const raw: string = err?.response?.data?.error?.message ?? '';
       const match = raw.match(/retry in ([\d.]+)s/);
       const delay = match ? Math.ceil(parseFloat(match[1])) * 1000 : 5000;
-      await new Promise(res => setTimeout(res, delay));
-      return callLLM(prompt, attempt + 1);
+      await new Promise((res) => setTimeout(res, delay));
+      return callLLM(systemPrompt, userMessage, attempt + 1);
     }
     throw err;
   }
 }
 
-function parseJSON<T>(raw: string): T {
-  // Strip markdown code fences if present
-  const cleaned = raw.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
-  return JSON.parse(cleaned) as T;
+// ─── APPEL 1 — Questions personnalisées ───────────────────────────────────────
+
+const SYSTEM_APPEL_1 = `Tu es un coach de décision expert. Tu analyses une situation décisionnelle et génères des questions de clarification.
+
+RÈGLE N°1 — CITATION OBLIGATOIRE :
+Chaque question DOIT citer au moins un élément extrait MOT POUR MOT du texte (chiffre, nom, formulation exacte).
+
+EXEMPLES DE CITATIONS OBLIGATOIRES :
+- texte dit '42k€' → question cite '42k€'
+- texte dit 'ma copine ne peut pas partir' → cite cette phrase
+- texte dit 'si je ne pars pas maintenant' → reprend ces mots
+- texte dit 'mon père est malade' → cite 'mon père est malade'
+
+RÈGLE N°2 — QUESTIONS INTERDITES (trop génériques) :
+'Qu'est-ce qui compte le plus pour toi ?'
+'Quels sont tes objectifs ?'
+'Comment tu te sens par rapport à ce choix ?'
+'Quelles sont tes contraintes ?'
+'Qu'est-ce qui t'attire dans chaque option ?'
+
+RÈGLE N°3 — QUESTION OBLIGATOIRE :
+L'une des 5 questions DOIT être de type 'choice' avec exactement ces 3 options : [label_option_A], [label_option_B], 'Les deux pareil'. Cette question sert à détecter l'instinct. Elle doit être formulée avec des mots du texte.
+Ex : 'Quand tu imagines ta journée dans 6 mois, lequel des deux te vient naturellement en premier ?'
+
+RÈGLE N°4 — PROGRESSION ÉMOTIONNELLE :
+Q1 : factuelle — cite un chiffre ou fait du texte
+Q2 : factuelle — cite une contrainte nommée
+Q3 : émotionnelle — cite une formulation révélatrice
+Q4 : OBLIGATOIRE — question instinct (voir règle N°3)
+Q5 : inconfortable — cite l'élément le plus sensible
+
+TYPES : 'choice' (2-4 options, max 6 mots chacune), 'slider' (extrêmes 3 mots max), 'open' (texte libre)
+
+FORMAT — JSON pur, sans markdown, sans backticks :
+{
+  "context_summary": "1-2 phrases citant des éléments concrets",
+  "option_a_label": "3 mots max",
+  "option_b_label": "3 mots max",
+  "instinct_question_id": "q4",
+  "questions": [
+    { "id": "q1", "question": "...", "hint": "...", "type": "choice", "options": ["...", "...", "..."] },
+    { "id": "q2", "question": "...", "hint": "...", "type": "slider", "min_label": "...", "max_label": "..." },
+    { "id": "q3", "question": "...", "hint": "...", "type": "open" },
+    { "id": "q4", "question": "...", "hint": "...", "type": "choice", "options": ["[optA]", "[optB]", "Les deux pareil"] },
+    { "id": "q5", "question": "...", "hint": "...", "type": "open" }
+  ]
+}`;
+
+export interface Appel1Response {
+  context_summary: string;
+  option_a_label: string;
+  option_b_label: string;
+  instinct_question_id: string;
+  questions: Question[];
 }
 
-function buildDirectPrompt(ctx: ConversationContext): string {
-  return `Tu es un expert en prise de décision rationnelle et émotionnelle. Analyse ce dilemme et donne une recommandation claire.
+export async function callAppel1(originalText: string): Promise<Appel1Response> {
+  const userMessage = `Situation à analyser mot par mot :
 
-DILEMME : "${ctx.dilemma}"
-OPTION A : "${ctx.optionA}"
-OPTION B : "${ctx.optionB}"
+---
+${originalText}
+---
 
-Réponds UNIQUEMENT avec un objet JSON valide, sans markdown :
+Génère 5 questions qui citent des éléments SPÉCIFIQUES de ce texte. Aucune question générique.`;
+
+  const raw = await callLLM(SYSTEM_APPEL_1, userMessage);
+  return parseResponse<Appel1Response>(raw);
+}
+
+// ─── APPEL 2 — Critères de pondération ───────────────────────────────────────
+
+const SYSTEM_APPEL_2 = `Tu es expert en analyse décisionnelle comportementale. Génère 5 critères d'évaluation nommés depuis les éléments SPÉCIFIQUES du texte de l'utilisateur.
+
+LABELS INTERDITS (trop génériques) :
+'Épanouissement personnel', 'Sécurité financière', 'Qualité de vie', 'Évolution de carrière', 'Équilibre vie pro/perso', 'Satisfaction', 'Bien-être'
+
+LABELS OBLIGATOIRES — construits depuis le texte :
+Si texte cite '42k€ vs 55k€' → label = 'Delta salarial 13k€'
+Si texte cite 'père malade' → label = 'Proximité père malade'
+Si texte cite 'copine ne peut pas partir' → 'Couple vs projet'
+Si texte cite '3k€ de MRR' → 'MRR validé vs CDI stable'
+Si texte cite 'crédit 900€' → 'Charges fixes 900€/mois'
+
+SCORES : A et B doivent être vraiment différenciés. Interdit : 5 vs 5, 6 vs 6, 7 vs 7. Justifie chaque score par les infos données.
+
+FORMAT — JSON pur sans markdown :
 {
-  "recommendation": "${ctx.optionA} ou ${ctx.optionB} (écris exactement le nom de l'option choisie)",
-  "reasoning": "Explication en 2-3 phrases empathiques et bien argumentées",
-  "biasAlerts": [
+  "criteria": [
     {
-      "type": "status_quo | loss_aversion | social_pressure | short_term",
-      "label": "Nom court du biais potentiel",
-      "description": "Explication courte et personnalisée",
-      "severity": "low | medium | high"
+      "id": "c1",
+      "label": "label depuis texte (4 mots max)",
+      "description": "pourquoi crucial ici (1 ligne)",
+      "default_weight": 7,
+      "score_a": 4,
+      "score_b": 8,
+      "score_rationale": "justification des scores (1 ligne)"
     }
   ]
 }`;
+
+export interface Appel2Response {
+  criteria: Criterion[];
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
+export async function callAppel2(ctx: {
+  originalText: string;
+  optionALabel: string;
+  optionBLabel: string;
+  questions: Question[];
+  answers: Record<string, string>;
+}): Promise<Appel2Response> {
+  const qaPairs = ctx.questions
+    .map((q) => `Q: ${q.question}  R: ${ctx.answers[q.id] ?? '(pas de réponse)'}`)
+    .join('\n');
 
-export async function getAdaptiveQuestion(
-  ctx: ConversationContext
-): Promise<LLMQuestionResponse> {
-  const prompt = buildQuestionPrompt(ctx);
-  const raw = await callLLM(prompt);
-  return parseJSON<LLMQuestionResponse>(raw);
+  const userMessage = `Situation : '${ctx.originalText}'
+Option A : ${ctx.optionALabel}
+Option B : ${ctx.optionBLabel}
+
+Réponses aux questions :
+${qaPairs}
+
+Génère 5 critères nommés depuis des éléments précis du texte.`;
+
+  const raw = await callLLM(SYSTEM_APPEL_2, userMessage);
+  return parseResponse<Appel2Response>(raw);
 }
 
-export async function getFullAnalysis(
-  ctx: ConversationContext,
-  mathematicalScoreA: number,
-  mathematicalScoreB: number,
-  emotionalScoreA: number,
-  emotionalScoreB: number
-): Promise<LLMAnalysisResponse> {
-  const prompt = buildAnalysisPrompt(
-    ctx,
-    mathematicalScoreA,
-    mathematicalScoreB,
-    emotionalScoreA,
-    emotionalScoreB
-  );
-  const raw = await callLLM(prompt);
-  return parseJSON<LLMAnalysisResponse>(raw);
-}
+// ─── APPEL 3 — Analyse finale ─────────────────────────────────────────────────
 
-export async function getDirectRecommendation(
-  ctx: Omit<ConversationContext, 'previousQA'>
-): Promise<LLMAnalysisResponse> {
-  const prompt = buildDirectPrompt({ ...ctx, previousQA: [] });
-  const raw = await callLLM(prompt);
-  return parseJSON<LLMAnalysisResponse>(raw);
+const SYSTEM_APPEL_3 = `Tu es psychologue spécialisé en prise de décision. Produis une analyse directe, honnête, non complaisante.
+
+RÈGLES :
+1. Cite des éléments SPÉCIFIQUES du texte dans chaque section (chiffres, formulations exactes, personnes nommées)
+2. Les biais : nomme comment ils se manifestent PRÉCISÉMENT ici
+3. Le blindspot : quelque chose que la personne n'a PAS dit mais devrait regarder en face
+4. La deciding_question : la plus inconfortable, basée sur l'élément le plus sensible du texte
+5. Sois direct. Pas de bienveillance excessive.
+6. recommendation : reprend exactement le label de l'option
+7. recommendation_reason : 2-3 phrases, cite des éléments précis. Ne répète pas les scores — l'app les affiche déjà.
+
+CONTRAINTES POUR LES % DE REGRET :
+- Valeur entre 15 et 85 UNIQUEMENT (jamais 0 ni 100)
+- Chaque % est obligatoirement suivi d'un scénario précis qui cite des éléments du texte ou des réponses
+- Le scénario doit être plausible et personnalisé
+- Format : 'Dans 1 an, si [scénario précis]...'
+
+FORMAT — JSON pur sans markdown :
+{
+  "recommendation": "label exact de l'option",
+  "recommendation_reason": "2-3 phrases avec citations",
+  "biases": [
+    { "name": "Nom du biais", "explanation": "Manifestation précise ici — cite le texte. 2 phrases." }
+  ],
+  "regret_score_chosen": 35,
+  "regret_chosen_reason": "Dans 1 an, si [scénario précis]...",
+  "regret_score_other": 68,
+  "regret_other_reason": "Dans 1 an, si [scénario précis]...",
+  "blindspot": "Ce qu'elle évite de voir. Direct. 2 phrases.",
+  "deciding_question": "La question radicale qui tranche tout."
+}`;
+
+export interface Appel3Response extends Analysis {}
+
+export async function callAppel3(ctx: {
+  originalText: string;
+  optionALabel: string;
+  optionBLabel: string;
+  scoreA: number;
+  scoreB: number;
+  labelNiveau: string;
+  questions: Question[];
+  answers: Record<string, string>;
+  criteria: { label: string; id: string }[];
+  weights: Record<string, number>;
+  userScoresA: Record<string, number>;
+  userScoresB: Record<string, number>;
+}): Promise<Appel3Response> {
+  const qaPairs = ctx.questions
+    .map((q) => `Q: ${q.question}  R: ${ctx.answers[q.id] ?? '(pas de réponse)'}`)
+    .join('\n');
+
+  const criteriaLines = ctx.criteria
+    .map(
+      (c) =>
+        `${c.label} : poids=${ctx.weights[c.id] ?? 5}, ${ctx.optionALabel}=${ctx.userScoresA[c.id] ?? 5}, ${ctx.optionBLabel}=${ctx.userScoresB[c.id] ?? 5}`
+    )
+    .join('\n');
+
+  const userMessage = `Situation : '${ctx.originalText}'
+Option A : ${ctx.optionALabel} — score pondéré : ${ctx.scoreA}/100
+Option B : ${ctx.optionBLabel} — score pondéré : ${ctx.scoreB}/100
+Niveau de recommandation calculé : ${ctx.labelNiveau}
+
+Réponses aux questions :
+${qaPairs}
+
+Critères et scores finaux :
+${criteriaLines}
+
+Produis l'analyse finale complète.`;
+
+  const raw = await callLLM(SYSTEM_APPEL_3, userMessage);
+  return parseResponse<Appel3Response>(raw);
 }

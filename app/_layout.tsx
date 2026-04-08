@@ -26,6 +26,7 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="dilemma/index" />
+        <Stack.Screen name="weighting/index" />
         <Stack.Screen
           name="result/index"
           options={{ animation: isWeb ? 'none' : 'fade' }}
