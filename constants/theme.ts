@@ -1,35 +1,35 @@
 export const Colors = {
   // Fonds
-  background: '#0D0D0F',
-  surface: '#1A1A1F',
-  surfaceElevated: '#242429',
-  border: '#2E2E35',
+  background: '#F4F4F6',
+  surface: '#FFFFFF',
+  surfaceElevated: '#E7E7E7',
+  border: '#E7E7E7',
 
-  // Primaire — violet électrique
-  primary: '#7C3AED',
-  primaryLight: '#9F67FF',
-  primaryDark: '#5B21B6',
+  // Primaire — Orange
+  primary: '#FF634A',
+  primaryLight: '#FFA494',
+  primaryDark: '#E64C33',
 
-  // Accent — cyan pour les scores
-  accent: '#06B6D4',
-  accentLight: '#22D3EE',
+  // Accent
+  accent: '#FF634A',
+  accentLight: '#FFA494',
 
-  // Regret Mode — rouge dramatique
+  // Regret Mode
   danger: '#EF4444',
   dangerLight: '#FCA5A5',
 
-  // Succès — vert doux
+  // Succès
   success: '#10B981',
   successLight: '#6EE7B7',
 
-  // Warning — pour les biais
+  // Warning
   warning: '#F59E0B',
   warningLight: '#FCD34D',
 
   // Textes
-  textPrimary: '#F9FAFB',
-  textSecondary: '#9CA3AF',
-  textMuted: '#4B5563',
+  textPrimary: '#272727', // Gris sombre (corrigé de #E7E7E7 pour rester lisible)
+  textSecondary: '#7E7E7E',
+  textMuted: '#A1A1A1',
 
   // Scores
   scoreHigh: '#10B981',
