@@ -15,10 +15,11 @@ import { Zap } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel1 } from '@/services/llmService';
+import { AiBadge } from '@/components/AiBadge';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { setAppel1Result, reset } = useDecisionStore();
+  const { setAppel1Result, reset, setAiProvider, aiProviders } = useDecisionStore();
 
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +33,7 @@ export default function HomeScreen() {
     reset();
     setIsLoading(true);
     try {
-      const result = await callAppel1(text.trim());
+      const { data: result, provider } = await callAppel1(text.trim());
       setAppel1Result({
         originalText: text.trim(),
         optionALabel: result.option_a_label,
@@ -41,6 +42,7 @@ export default function HomeScreen() {
         questions: result.questions,
         instinctQuestionId: result.instinct_question_id,
       });
+      setAiProvider('appel1', provider);
       router.push('/dilemma');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Erreur inconnue';
@@ -113,7 +115,10 @@ export default function HomeScreen() {
           )}
         </Pressable>
 
-        <Text style={styles.footer}>3 étapes · ~2 min · Analyse IA complète</Text>
+        <View style={styles.footerRow}>
+          <Text style={styles.footer}>3 étapes · ~2 min · Analyse IA complète</Text>
+          <AiBadge provider={aiProviders.appel1} />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -223,6 +228,10 @@ const styles = StyleSheet.create({
   },
   loadingRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  footerRow: {
     alignItems: 'center',
     gap: Spacing.sm,
   },

@@ -2,11 +2,9 @@ import axios from 'axios';
 import type { Question, Criterion, Analysis } from '@/store/decisionStore';
 
 const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
-const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
-const LLM_PROVIDER = (process.env.EXPO_PUBLIC_LLM_PROVIDER ?? 'gemini') as 'gemini' | 'anthropic' | 'openai';
 
-const TIMEOUT = 50000;
+const TIMEOUT = 30000;
 
 // ─── JSON parsing robuste (depuis la spec PDF) ────────────────────────────────
 
@@ -26,7 +24,7 @@ async function callAnthropic(systemPrompt: string, userMessage: string): Promise
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 2000,
       system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
@@ -43,29 +41,6 @@ async function callAnthropic(systemPrompt: string, userMessage: string): Promise
   return response.data.content[0].text;
 }
 
-async function callOpenAI(systemPrompt: string, userMessage: string): Promise<string> {
-  const response = await axios.post(
-    'https://api.openai.com/v1/chat/completions',
-    {
-      model: 'gpt-4o-mini',
-      max_tokens: 2000,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      response_format: { type: 'json_object' },
-    },
-    {
-      timeout: TIMEOUT,
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        'content-type': 'application/json',
-      },
-    }
-  );
-  return response.data.choices[0].message.content;
-}
-
 async function callGemini(systemPrompt: string, userMessage: string): Promise<string> {
   const response = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`,
@@ -79,13 +54,19 @@ async function callGemini(systemPrompt: string, userMessage: string): Promise<st
   return response.data.candidates[0].content.parts[0].text;
 }
 
-async function callLLM(systemPrompt: string, userMessage: string, attempt = 0): Promise<string> {
+// ─── Appel LLM : Gemini en premier, fallback Anthropic ───────────────────────
+
+async function callLLM(
+  systemPrompt: string,
+  userMessage: string,
+  attempt = 0
+): Promise<{ text: string; provider: 'gemini' | 'anthropic' }> {
   try {
-    if (LLM_PROVIDER === 'anthropic') return await callAnthropic(systemPrompt, userMessage);
-    if (LLM_PROVIDER === 'openai') return await callOpenAI(systemPrompt, userMessage);
-    return await callGemini(systemPrompt, userMessage);
+    const text = await callGemini(systemPrompt, userMessage);
+    return { text, provider: 'gemini' };
   } catch (err: any) {
     const status = err?.response?.status;
+    // Retry Gemini sur rate limit
     if (status === 429 && attempt < 2) {
       const raw: string = err?.response?.data?.error?.message ?? '';
       const match = raw.match(/retry in ([\d.]+)s/);
@@ -93,7 +74,9 @@ async function callLLM(systemPrompt: string, userMessage: string, attempt = 0): 
       await new Promise((res) => setTimeout(res, delay));
       return callLLM(systemPrompt, userMessage, attempt + 1);
     }
-    throw err;
+    // Fallback Anthropic sur toute autre erreur
+    const text = await callAnthropic(systemPrompt, userMessage);
+    return { text, provider: 'anthropic' };
   }
 }
 
@@ -153,7 +136,7 @@ export interface Appel1Response {
   questions: Question[];
 }
 
-export async function callAppel1(originalText: string): Promise<Appel1Response> {
+export async function callAppel1(originalText: string): Promise<{ data: Appel1Response; provider: string }> {
   const userMessage = `Situation à analyser mot par mot :
 
 ---
@@ -162,8 +145,8 @@ ${originalText}
 
 Génère 5 questions qui citent des éléments SPÉCIFIQUES de ce texte. Aucune question générique.`;
 
-  const raw = await callLLM(SYSTEM_APPEL_1, userMessage);
-  return parseResponse<Appel1Response>(raw);
+  const { text, provider } = await callLLM(SYSTEM_APPEL_1, userMessage);
+  return { data: parseResponse<Appel1Response>(text), provider };
 }
 
 // ─── APPEL 2 — Critères de pondération ───────────────────────────────────────
@@ -207,7 +190,7 @@ export async function callAppel2(ctx: {
   optionBLabel: string;
   questions: Question[];
   answers: Record<string, string>;
-}): Promise<Appel2Response> {
+}): Promise<{ data: Appel2Response; provider: string }> {
   const qaPairs = ctx.questions
     .map((q) => `Q: ${q.question}  R: ${ctx.answers[q.id] ?? '(pas de réponse)'}`)
     .join('\n');
@@ -221,8 +204,8 @@ ${qaPairs}
 
 Génère 5 critères nommés depuis des éléments précis du texte.`;
 
-  const raw = await callLLM(SYSTEM_APPEL_2, userMessage);
-  return parseResponse<Appel2Response>(raw);
+  const { text, provider } = await callLLM(SYSTEM_APPEL_2, userMessage);
+  return { data: parseResponse<Appel2Response>(text), provider };
 }
 
 // ─── APPEL 3 — Analyse finale ─────────────────────────────────────────────────
@@ -274,7 +257,7 @@ export async function callAppel3(ctx: {
   weights: Record<string, number>;
   userScoresA: Record<string, number>;
   userScoresB: Record<string, number>;
-}): Promise<Appel3Response> {
+}): Promise<{ data: Appel3Response; provider: string }> {
   const qaPairs = ctx.questions
     .map((q) => `Q: ${q.question}  R: ${ctx.answers[q.id] ?? '(pas de réponse)'}`)
     .join('\n');
@@ -299,6 +282,6 @@ ${criteriaLines}
 
 Produis l'analyse finale complète.`;
 
-  const raw = await callLLM(SYSTEM_APPEL_3, userMessage);
-  return parseResponse<Appel3Response>(raw);
+  const { text, provider } = await callLLM(SYSTEM_APPEL_3, userMessage);
+  return { data: parseResponse<Appel3Response>(text), provider };
 }

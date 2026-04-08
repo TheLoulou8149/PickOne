@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
+import { AiBadge } from '@/components/AiBadge';
 
 // ─── Couleurs niveau de reco ───────────────────────────────────────────────────
 
@@ -516,6 +517,9 @@ export default function ResultScreen() {
       {analysis?.deciding_question ? (
         <DecidingQuestion question={analysis.deciding_question} />
       ) : null}
+
+      {/* Badge IA */}
+      <AiBadge provider={store.aiProviders.appel3} />
 
       {/* Restart */}
       <TouchableOpacity

@@ -63,6 +63,9 @@ export interface DecisionState {
   // ─── Appel 3 ──────────────────────────────────────────────────────────────
   analysis: Analysis | null;
 
+  // ─── Providers IA ─────────────────────────────────────────────────────────
+  aiProviders: { appel1: string | null; appel2: string | null; appel3: string | null };
+
   // ─── UI ───────────────────────────────────────────────────────────────────
   isLoading: boolean;
   phase: 'input' | 'questions' | 'weighting' | 'result';
@@ -83,6 +86,7 @@ export interface DecisionState {
   setUserScoreB: (criterionId: string, score: number) => void;
   computeScores: () => void;
   setAnalysis: (analysis: Analysis) => void;
+  setAiProvider: (appel: 'appel1' | 'appel2' | 'appel3', provider: string) => void;
   setLoading: (loading: boolean) => void;
   setPhase: (phase: DecisionState['phase']) => void;
   reset: () => void;
@@ -137,7 +141,7 @@ function getCoherenceMessage(
 const INIT: Omit<DecisionState,
   | 'setAppel1Result' | 'setAnswer' | 'setAppel2Result' | 'setWeight'
   | 'setUserScoreA' | 'setUserScoreB' | 'computeScores' | 'setAnalysis'
-  | 'setLoading' | 'setPhase' | 'reset'
+  | 'setAiProvider' | 'setLoading' | 'setPhase' | 'reset'
 > = {
   originalText: '',
   optionALabel: '',
@@ -157,6 +161,7 @@ const INIT: Omit<DecisionState,
   messageCoherence: '',
   winner: '',
   analysis: null,
+  aiProviders: { appel1: null, appel2: null, appel3: null },
   isLoading: false,
   phase: 'input',
 };
@@ -205,6 +210,8 @@ export const useDecisionStore = create<DecisionState>((set, get) => ({
   },
 
   setAnalysis: (analysis) => set({ analysis }),
+  setAiProvider: (appel, provider) =>
+    set((s) => ({ aiProviders: { ...s.aiProviders, [appel]: provider } })),
   setLoading: (isLoading) => set({ isLoading }),
   setPhase: (phase) => set({ phase }),
   reset: () => set({ ...INIT }),

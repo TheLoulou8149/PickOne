@@ -13,6 +13,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel2 } from '@/services/llmService';
+import { AiBadge } from '@/components/AiBadge';
 import type { Question } from '@/store/decisionStore';
 
 // ─── Composant slider segmenté (1-10) ─────────────────────────────────────────
@@ -207,7 +208,7 @@ export default function QuestionsScreen() {
       }
       const allAnswers = { ...store.answers, ...localAnswers };
 
-      const result = await callAppel2({
+      const { data: result, provider } = await callAppel2({
         originalText: store.originalText,
         optionALabel: store.optionALabel,
         optionBLabel: store.optionBLabel,
@@ -215,6 +216,7 @@ export default function QuestionsScreen() {
         answers: allAnswers,
       });
       store.setAppel2Result(result.criteria);
+      store.setAiProvider('appel2', provider);
       router.push('/weighting');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Erreur inconnue';
@@ -266,12 +268,15 @@ export default function QuestionsScreen() {
       </View>
 
       {/* Contexte */}
-      <View style={styles.contextPill}>
-        <Text style={styles.contextText} numberOfLines={1}>
-          <Text style={styles.contextOpt}>{store.optionALabel}</Text>
-          <Text style={styles.contextVs}> vs </Text>
-          <Text style={styles.contextOpt}>{store.optionBLabel}</Text>
-        </Text>
+      <View style={styles.contextRow}>
+        <View style={styles.contextPill}>
+          <Text style={styles.contextText} numberOfLines={1}>
+            <Text style={styles.contextOpt}>{store.optionALabel}</Text>
+            <Text style={styles.contextVs}> vs </Text>
+            <Text style={styles.contextOpt}>{store.optionBLabel}</Text>
+          </Text>
+        </View>
+        <AiBadge provider={store.aiProviders.appel1} />
       </View>
 
       {/* Carte question */}
@@ -375,6 +380,12 @@ const styles = StyleSheet.create({
     fontSize: Typography.fontSizeXS,
     color: Colors.textMuted,
     alignSelf: 'flex-end',
+  },
+  contextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    flexWrap: 'wrap',
   },
   contextPill: {
     alignSelf: 'flex-start',

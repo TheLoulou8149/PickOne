@@ -12,6 +12,7 @@ import { ChevronRight, Scale } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel3 } from '@/services/llmService';
+import { AiBadge } from '@/components/AiBadge';
 import type { Criterion } from '@/store/decisionStore';
 
 // ─── Slider segmenté ──────────────────────────────────────────────────────────
@@ -289,7 +290,7 @@ export default function WeightingScreen() {
     try {
       store.computeScores();
       const s = store;
-      const result = await callAppel3({
+      const { data: result, provider } = await callAppel3({
         originalText: s.originalText,
         optionALabel: s.optionALabel,
         optionBLabel: s.optionBLabel,
@@ -304,6 +305,7 @@ export default function WeightingScreen() {
         userScoresB: s.userScoresB,
       });
       store.setAnalysis(result);
+      store.setAiProvider('appel3', provider);
       router.push('/result');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Erreur inconnue';
@@ -325,6 +327,7 @@ export default function WeightingScreen() {
         <Text style={styles.subtitle}>
           L'IA a nommé ces critères depuis ton texte. Tu peux affiner les poids et les notes.
         </Text>
+        <AiBadge provider={store.aiProviders.appel2} />
       </View>
 
       {/* Résumé contexte */}
