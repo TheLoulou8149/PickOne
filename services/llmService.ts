@@ -6,7 +6,7 @@ const OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 const LLM_PROVIDER = (process.env.EXPO_PUBLIC_LLM_PROVIDER ?? 'gemini') as 'gemini' | 'anthropic' | 'openai';
 
-const TIMEOUT = 30000;
+const TIMEOUT = 50000;
 
 // ─── JSON parsing robuste (depuis la spec PDF) ────────────────────────────────
 
