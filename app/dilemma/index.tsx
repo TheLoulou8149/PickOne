@@ -12,7 +12,7 @@ import { useState } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
-import { callAppel2 } from '@/services/llmService';
+import { callAppel2, callAppel3 } from '@/services/llmService';
 import { AiBadge } from '@/components/AiBadge';
 import type { Question } from '@/store/decisionStore';
 
@@ -198,7 +198,7 @@ export default function QuestionsScreen() {
       return;
     }
 
-    // Last question answered → call Appel 2
+    // Last question answered → Appel 2 → Appel 3 → Result
     setError('');
     setIsSubmitting(true);
     try {
@@ -208,16 +208,63 @@ export default function QuestionsScreen() {
       }
       const allAnswers = { ...store.answers, ...localAnswers };
 
-      const { data: result, provider } = await callAppel2({
+      // Appel 2 — critères
+      const { data: result2, provider: p2 } = await callAppel2({
         originalText: store.originalText,
         optionALabel: store.optionALabel,
         optionBLabel: store.optionBLabel,
         questions: store.questions,
         answers: allAnswers,
       });
-      store.setAppel2Result(result.criteria);
-      store.setAiProvider('appel2', provider);
-      router.push('/weighting');
+      store.setAppel2Result(result2.criteria);
+      store.setAiProvider('appel2', p2);
+
+      // Compute scores from Appel 2 defaults
+      const criteria = result2.criteria;
+      const weights: Record<string, number> = {};
+      const scoresA: Record<string, number> = {};
+      const scoresB: Record<string, number> = {};
+      for (const c of criteria) {
+        weights[c.id] = c.default_weight;
+        scoresA[c.id] = c.score_a;
+        scoresB[c.id] = c.score_b;
+      }
+      const totalPoids = criteria.reduce((sum, c) => sum + c.default_weight, 0);
+      const scoreA = totalPoids > 0
+        ? Math.round(criteria.reduce((sum, c) => sum + c.score_a * c.default_weight, 0) / totalPoids * 10)
+        : 0;
+      const scoreB = totalPoids > 0
+        ? Math.round(criteria.reduce((sum, c) => sum + c.score_b * c.default_weight, 0) / totalPoids * 10)
+        : 0;
+      const winner = scoreA >= scoreB ? store.optionALabel : store.optionBLabel;
+      const ecart = Math.abs(scoreA - scoreB);
+      const labelNiveau = ecart < 5
+        ? 'Décision serrée — les deux options se valent'
+        : ecart < 15
+          ? `Légère préférence pour ${winner}`
+          : `Recommandation claire : ${winner}`;
+
+      store.computeScores();
+
+      // Appel 3 — analyse finale
+      const { data: result3, provider: p3 } = await callAppel3({
+        originalText: store.originalText,
+        optionALabel: store.optionALabel,
+        optionBLabel: store.optionBLabel,
+        scoreA,
+        scoreB,
+        labelNiveau,
+        questions: store.questions,
+        answers: allAnswers,
+        criteria,
+        weights,
+        userScoresA: scoresA,
+        userScoresB: scoresB,
+      });
+      store.setAnalysis(result3);
+      store.setAiProvider('appel3', p3);
+
+      router.push('/result');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Erreur inconnue';
       setError(`Erreur : ${msg}`);
@@ -284,10 +331,6 @@ export default function QuestionsScreen() {
         <Text style={styles.stepBadge}>Question {currentIdx + 1}</Text>
         <Text style={styles.questionText}>{current.question}</Text>
 
-        {current.hint ? (
-          <Text style={styles.hintText}>{current.hint}</Text>
-        ) : null}
-
         <View style={styles.inputWrap}>
           <QuestionInput
             question={current}
@@ -315,7 +358,7 @@ export default function QuestionsScreen() {
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              <Text style={styles.nextText}>{isLast ? 'Voir les critères' : 'Suivant'}</Text>
+              <Text style={styles.nextText}>{isLast ? 'Analyser' : 'Suivant'}</Text>
               <ChevronRight size={18} color="#fff" />
             </>
           )}
@@ -428,11 +471,6 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeightBold,
     color: Colors.textPrimary,
     lineHeight: Typography.fontSizeXL * 1.35,
-  },
-  hintText: {
-    fontSize: Typography.fontSizeSM,
-    color: Colors.textMuted,
-    fontStyle: 'italic',
   },
   inputWrap: {
     marginTop: Spacing.xs,

@@ -200,44 +200,29 @@ const coherenceStyles = StyleSheet.create({
   },
 });
 
-// ─── 4. Détail critères ────────────────────────────────────────────────────────
+// ─── 4. Baromètres critères ───────────────────────────────────────────────────
 
-function CriteriaTable({
+function CriteriaBarometers({
   criteria,
   weights,
-  scoresA,
-  scoresB,
-  optionALabel,
-  optionBLabel,
 }: {
   criteria: any[];
   weights: Record<string, number>;
-  scoresA: Record<string, number>;
-  scoresB: Record<string, number>;
-  optionALabel: string;
-  optionBLabel: string;
 }) {
   return (
     <Section>
-      <SectionTitle>Détail par critère</SectionTitle>
-      <View style={tableStyles.headerRow}>
-        <Text style={[tableStyles.headerCell, { flex: 2 }]}>Critère</Text>
-        <Text style={tableStyles.headerCell}>Poids</Text>
-        <Text style={[tableStyles.headerCell, { color: Colors.accent }]}>{optionALabel}</Text>
-        <Text style={[tableStyles.headerCell, { color: Colors.success }]}>{optionBLabel}</Text>
-      </View>
+      <SectionTitle>Critères analysés</SectionTitle>
       {criteria.map((c) => {
         const w = weights[c.id] ?? c.default_weight;
-        const a = scoresA[c.id] ?? c.score_a;
-        const b = scoresB[c.id] ?? c.score_b;
-        const winnerA = a > b;
-        const winnerB = b > a;
         return (
-          <View key={c.id} style={tableStyles.row}>
-            <Text style={[tableStyles.cell, { flex: 2 }]} numberOfLines={2}>{c.label}</Text>
-            <Text style={[tableStyles.cell, tableStyles.center]}>{w}</Text>
-            <Text style={[tableStyles.cell, tableStyles.center, winnerA && { color: Colors.accent, fontWeight: Typography.fontWeightBold }]}>{a}</Text>
-            <Text style={[tableStyles.cell, tableStyles.center, winnerB && { color: Colors.success, fontWeight: Typography.fontWeightBold }]}>{b}</Text>
+          <View key={c.id} style={bmStyles.row}>
+            <Text style={bmStyles.label} numberOfLines={1}>{c.label}</Text>
+            <View style={bmStyles.barWrap}>
+              <View style={bmStyles.barTrack}>
+                <View style={[bmStyles.barFill, { width: `${w * 10}%` }]} />
+              </View>
+            </View>
+            <Text style={bmStyles.value}>{w}</Text>
           </View>
         );
       })}
@@ -245,40 +230,44 @@ function CriteriaTable({
   );
 }
 
-const tableStyles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    gap: Spacing.xs,
-    paddingBottom: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  headerCell: {
-    flex: 1,
-    fontSize: Typography.fontSizeXS,
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    textAlign: 'center',
-  },
+const bmStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border + '60',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
-  cell: {
-    flex: 1,
+  label: {
+    flex: 1.5,
     fontSize: Typography.fontSizeSM,
     color: Colors.textSecondary,
+    fontWeight: Typography.fontWeightSemiBold,
   },
-  center: { textAlign: 'center' },
+  barWrap: {
+    flex: 2,
+  },
+  barTrack: {
+    height: 6,
+    backgroundColor: Colors.border,
+    borderRadius: BorderRadius.full,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.full,
+  },
+  value: {
+    width: 20,
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textMuted,
+    textAlign: 'right',
+    fontWeight: Typography.fontWeightBold,
+  },
 });
 
 // ─── 5. Biais ─────────────────────────────────────────────────────────────────
 
-function BiasCard({ bias, index }: { bias: { name: string; explanation: string }; index: number }) {
+function BiasCard({ bias }: { bias: { name: string; explanation: string } }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <TouchableOpacity
@@ -401,7 +390,7 @@ function DecidingQuestion({ question }: { question: string }) {
         <HelpCircle size={18} color={Colors.primaryLight} />
         <Text style={dqStyles.label}>La question qui tranche tout</Text>
       </View>
-      <Text style={dqStyles.question}>"{question}"</Text>
+      <Text style={dqStyles.question}>{question}</Text>
     </View>
   );
 }
@@ -467,15 +456,11 @@ export default function ResultScreen() {
         <CoherenceCard message={store.messageCoherence} />
       ) : null}
 
-      {/* 4. Détail critères */}
+      {/* 4. Baromètres critères */}
       {store.criteria.length > 0 ? (
-        <CriteriaTable
+        <CriteriaBarometers
           criteria={store.criteria}
           weights={store.weights}
-          scoresA={store.userScoresA}
-          scoresB={store.userScoresB}
-          optionALabel={store.optionALabel}
-          optionBLabel={store.optionBLabel}
         />
       ) : null}
 
@@ -484,7 +469,7 @@ export default function ResultScreen() {
         <Section>
           <SectionTitle color={Colors.warning}>Biais détectés</SectionTitle>
           {analysis.biases.map((b, i) => (
-            <BiasCard key={i} bias={b} index={i} />
+            <BiasCard key={i} bias={b} />
           ))}
         </Section>
       ) : null}

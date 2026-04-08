@@ -1,5 +1,8 @@
 import axios from 'axios';
+import { Platform } from 'react-native';
 import type { Question, Criterion, Analysis } from '@/store/decisionStore';
+
+const IS_WEB = Platform.OS === 'web';
 
 const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
@@ -48,6 +51,14 @@ function parseResponse<T>(raw: string): T {
 // ─── Appels API par provider ──────────────────────────────────────────────────
 
 async function callAnthropic(systemPrompt: string, userMessage: string): Promise<string> {
+  if (IS_WEB) {
+    const response = await axios.post(
+      '/api/llm',
+      { target: 'anthropic', systemPrompt, userMessage },
+      { timeout: TIMEOUT }
+    );
+    return response.data.text;
+  }
   const response = await axios.post(
     'https://api.anthropic.com/v1/messages',
     {
@@ -69,6 +80,14 @@ async function callAnthropic(systemPrompt: string, userMessage: string): Promise
 }
 
 async function callGemini(systemPrompt: string, userMessage: string): Promise<string> {
+  if (IS_WEB) {
+    const response = await axios.post(
+      '/api/llm',
+      { target: 'gemini', systemPrompt, userMessage },
+      { timeout: TIMEOUT }
+    );
+    return response.data.text;
+  }
   const response = await axios.post(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`,
     {
@@ -111,47 +130,40 @@ async function callLLM(
 
 const SYSTEM_APPEL_1 = `Tu es un coach de décision expert. Tu analyses une situation décisionnelle et génères des questions de clarification.
 
-RÈGLE N°1 — CITATION OBLIGATOIRE :
-Chaque question DOIT citer au moins un élément extrait MOT POUR MOT du texte (chiffre, nom, formulation exacte).
-
-EXEMPLES DE CITATIONS OBLIGATOIRES :
-- texte dit '42k€' → question cite '42k€'
-- texte dit 'ma copine ne peut pas partir' → cite cette phrase
-- texte dit 'si je ne pars pas maintenant' → reprend ces mots
-- texte dit 'mon père est malade' → cite 'mon père est malade'
-
-RÈGLE N°2 — QUESTIONS INTERDITES (trop génériques) :
+RÈGLE N°1 — QUESTIONS INTERDITES (trop génériques) :
 'Qu'est-ce qui compte le plus pour toi ?'
 'Quels sont tes objectifs ?'
 'Comment tu te sens par rapport à ce choix ?'
 'Quelles sont tes contraintes ?'
 'Qu'est-ce qui t'attire dans chaque option ?'
 
-RÈGLE N°3 — QUESTION OBLIGATOIRE :
-L'une des 5 questions DOIT être de type 'choice' avec exactement ces 3 options : [label_option_A], [label_option_B], 'Les deux pareil'. Cette question sert à détecter l'instinct. Elle doit être formulée avec des mots du texte.
+RÈGLE N°2 — QUESTION OBLIGATOIRE :
+L'une des 5 questions DOIT être de type 'choice' avec exactement ces 3 options : [label_option_A], [label_option_B], 'Les deux pareil'. Cette question sert à détecter l'instinct.
 Ex : 'Quand tu imagines ta journée dans 6 mois, lequel des deux te vient naturellement en premier ?'
 
-RÈGLE N°4 — PROGRESSION ÉMOTIONNELLE :
-Q1 : factuelle — cite un chiffre ou fait du texte
-Q2 : factuelle — cite une contrainte nommée
-Q3 : émotionnelle — cite une formulation révélatrice
-Q4 : OBLIGATOIRE — question instinct (voir règle N°3)
-Q5 : inconfortable — cite l'élément le plus sensible
+RÈGLE N°3 — PROGRESSION ÉMOTIONNELLE :
+Q1 : factuelle — un fait ou chiffre clé de la situation
+Q2 : factuelle — une contrainte ou enjeu concret
+Q3 : émotionnelle — ressenti, peur ou désir autour du choix
+Q4 : OBLIGATOIRE — question instinct (voir règle N°2)
+Q5 : inconfortable — la question que la personne préfère ne pas se poser
+
+N'utilise PAS de guillemets autour des mots dans les questions.
 
 TYPES : 'choice' (2-4 options, max 6 mots chacune), 'slider' (extrêmes 3 mots max), 'open' (texte libre)
 
 FORMAT — JSON pur, sans markdown, sans backticks :
 {
-  "context_summary": "1-2 phrases citant des éléments concrets",
+  "context_summary": "1-2 phrases résumant la situation",
   "option_a_label": "3 mots max",
   "option_b_label": "3 mots max",
   "instinct_question_id": "q4",
   "questions": [
-    { "id": "q1", "question": "...", "hint": "...", "type": "choice", "options": ["...", "...", "..."] },
-    { "id": "q2", "question": "...", "hint": "...", "type": "slider", "min_label": "...", "max_label": "..." },
-    { "id": "q3", "question": "...", "hint": "...", "type": "open" },
-    { "id": "q4", "question": "...", "hint": "...", "type": "choice", "options": ["[optA]", "[optB]", "Les deux pareil"] },
-    { "id": "q5", "question": "...", "hint": "...", "type": "open" }
+    { "id": "q1", "question": "...", "type": "choice", "options": ["...", "...", "..."] },
+    { "id": "q2", "question": "...", "type": "slider", "min_label": "...", "max_label": "..." },
+    { "id": "q3", "question": "...", "type": "open" },
+    { "id": "q4", "question": "...", "type": "choice", "options": ["[optA]", "[optB]", "Les deux pareil"] },
+    { "id": "q5", "question": "...", "type": "open" }
   ]
 }`;
 
@@ -164,13 +176,13 @@ export interface Appel1Response {
 }
 
 export async function callAppel1(originalText: string): Promise<{ data: Appel1Response; provider: string }> {
-  const userMessage = `Situation à analyser mot par mot :
+  const userMessage = `Situation à analyser :
 
 ---
 ${originalText}
 ---
 
-Génère 5 questions qui citent des éléments SPÉCIFIQUES de ce texte. Aucune question générique.`;
+Génère 5 questions pertinentes et progressives sur cette situation.`;
 
   const { text, provider } = await callLLM(SYSTEM_APPEL_1, userMessage);
   return { data: parseResponse<Appel1Response>(text), provider };
