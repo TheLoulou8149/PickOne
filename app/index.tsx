@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Zap, Clock } from 'lucide-react-native';
+import { Zap, Clock, UserCircle } from 'lucide-react-native';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -129,6 +129,9 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.historyBtn} onPress={() => router.push('/history' as any)}>
             <Clock size={20} color={Colors.textMuted} />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.profileBtn} onPress={() => router.push('/profile' as any)}>
+            <UserCircle size={22} color={Colors.textMuted} />
+          </TouchableOpacity>
           <View style={styles.iconWrap}>
             <Zap size={26} color={Colors.primary} strokeWidth={2.5} />
           </View>
@@ -214,7 +217,8 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing['2xl'],
   },
   header: { alignItems: 'center', marginBottom: Spacing['2xl'] },
-  historyBtn: { position: 'absolute', right: 0, top: 0, padding: Spacing.xs },
+  historyBtn: { position: 'absolute', left: 0, top: 0, padding: Spacing.xs },
+  profileBtn: { position: 'absolute', right: 0, top: 0, padding: Spacing.xs },
   iconWrap: {
     width: 52,
     height: 52,

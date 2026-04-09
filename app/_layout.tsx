@@ -68,6 +68,7 @@ export default function RootLayout() {
         <Stack.Screen name="auth/index" />
         <Stack.Screen name="history/index" />
         <Stack.Screen name="history/[id]" />
+        <Stack.Screen name="profile/index" />
       </Stack>
     </>
   );

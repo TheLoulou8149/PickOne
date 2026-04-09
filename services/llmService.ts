@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import type { Question, Criterion, Analysis } from '@/store/decisionStore';
+import { supabase } from '@/lib/supabase';
 
 const IS_WEB = Platform.OS === 'web';
 
@@ -126,6 +127,30 @@ async function callLLM(
   }
 }
 
+// ─── Contexte utilisateur ─────────────────────────────────────────────────────
+
+export async function getUserContextBlock(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return '';
+  const { data } = await supabase
+    .from('user_context')
+    .select('age, situation_pro, situation_perso, valeurs, style_risque, contexte_libre')
+    .eq('user_id', user.id)
+    .single();
+  if (!data) return '';
+
+  const lines: string[] = [];
+  if (data.age) lines.push(`- Âge : ${data.age}`);
+  if (data.situation_pro) lines.push(`- Situation pro : ${data.situation_pro}`);
+  if (data.situation_perso) lines.push(`- Situation perso : ${data.situation_perso}`);
+  if (data.valeurs) lines.push(`- Valeurs : ${data.valeurs}`);
+  if (data.style_risque) lines.push(`- Rapport au risque : ${data.style_risque}`);
+  if (data.contexte_libre) lines.push(`- Contexte libre : ${data.contexte_libre}`);
+
+  if (lines.length === 0) return '';
+  return `\n\nPROFIL DE L'UTILISATEUR (à prendre en compte discrètement, sans le citer explicitement) :\n${lines.join('\n')}`;
+}
+
 // ─── APPEL 1 — Questions personnalisées ───────────────────────────────────────
 
 const SYSTEM_APPEL_1 = `Tu es un coach de décision expert. Tu analyses une situation décisionnelle et génères des questions de clarification.
@@ -182,12 +207,13 @@ export interface Appel1Response {
 }
 
 export async function callAppel1(originalText: string): Promise<{ data: Appel1Response; provider: string }> {
+  const ctxBlock = await getUserContextBlock();
   const userMessage = `Situation à analyser :
 
 ---
 ${originalText}
 ---
-
+${ctxBlock}
 Génère 5 questions pertinentes et progressives sur cette situation.`;
 
   const { text, provider } = await callLLM(SYSTEM_APPEL_1, userMessage);
@@ -240,10 +266,11 @@ export async function callAppel2(ctx: {
     .map((q) => `Q: ${q.question}  R: ${ctx.answers[q.id] ?? '(pas de réponse)'}`)
     .join('\n');
 
+  const ctxBlock = await getUserContextBlock();
   const userMessage = `Situation : '${ctx.originalText}'
 Option A : ${ctx.optionALabel}
 Option B : ${ctx.optionBLabel}
-
+${ctxBlock}
 Réponses aux questions :
 ${qaPairs}
 
@@ -315,11 +342,12 @@ export async function callAppel3(ctx: {
     )
     .join('\n');
 
+  const ctxBlock = await getUserContextBlock();
   const userMessage = `Situation : '${ctx.originalText}'
 Option A : ${ctx.optionALabel} — score pondéré : ${ctx.scoreA}/100
 Option B : ${ctx.optionBLabel} — score pondéré : ${ctx.scoreB}/100
 Niveau de recommandation calculé : ${ctx.labelNiveau}
-
+${ctxBlock}
 Réponses aux questions :
 ${qaPairs}
 
