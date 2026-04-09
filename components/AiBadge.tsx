@@ -1,20 +1,20 @@
 import { View, Text, StyleSheet } from 'react-native';
-import { Typography, Spacing, BorderRadius } from '@/constants/theme';
+import { Typography, Colors } from '@/constants/theme';
 
-const PROVIDER_CONFIG: Record<string, { name: string; color: string }> = {
-  gemini: { name: 'Gemini 3.1 Flash Lite', color: '#8B5CF6' },
-  anthropic: { name: 'Claude 3.5 Haiku', color: '#F97316' },
+const PROVIDER_NAMES: Record<string, string> = {
+  gemini: 'Gemini 3.1 Flash Lite',
+  anthropic: 'Claude 3.5 Haiku',
 };
 
 export function AiBadge({ provider }: { provider: string | null | undefined }) {
   if (!provider) return null;
-  const config = PROVIDER_CONFIG[provider];
-  if (!config) return null;
+  const name = PROVIDER_NAMES[provider];
+  if (!name) return null;
 
   return (
-    <View style={[styles.badge, { borderColor: config.color + '50' }]}>
-      <View style={[styles.dot, { backgroundColor: config.color }]} />
-      <Text style={[styles.text, { color: config.color }]}>{config.name}</Text>
+    <View style={styles.badge}>
+      <View style={styles.dot} />
+      <Text style={styles.text}>{name}</Text>
     </View>
   );
 }
@@ -24,20 +24,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-    borderRadius: BorderRadius.full,
-    borderWidth: 1,
     gap: 5,
   },
   dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.textMuted,
   },
   text: {
     fontSize: Typography.fontSizeXS,
-    fontWeight: Typography.fontWeightSemiBold,
-    letterSpacing: 0.2,
+    color: Colors.textMuted,
+    letterSpacing: 0.1,
   },
 });

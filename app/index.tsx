@@ -9,10 +9,11 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Zap, Clock, UserCircle } from 'lucide-react-native';
+import { UserCircle, Menu } from 'lucide-react-native';
 import {
   ExpoSpeechRecognitionModule,
   useSpeechRecognitionEvent,
@@ -20,18 +21,18 @@ import {
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel1 } from '@/services/llmService';
-import { AiBadge } from '@/components/AiBadge';
 import { MicButton } from '@/components/MicButton';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { setAppel1Result, reset, setAiProvider, aiProviders } = useDecisionStore();
+  const { setAppel1Result, reset, setAiProvider } = useDecisionStore();
 
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
+  const [showBetaBanner, setShowBetaBanner] = useState(true);
 
   const canStart = text.trim().length > 20;
 
@@ -118,27 +119,62 @@ export default function HomeScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Popup bêta */}
+      <Modal
+        visible={showBetaBanner}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowBetaBanner(false)}
+      >
+        <View style={betaStyles.overlay}>
+          <View style={betaStyles.sheet}>
+            <View style={betaStyles.badgeRow}>
+              <View style={betaStyles.badge}>
+                <Text style={betaStyles.badgeText}>BÊTA</Text>
+              </View>
+            </View>
+            <Text style={betaStyles.title}>Application en cours de développement</Text>
+            <Text style={betaStyles.body}>
+              PickOne est encore en version bêta. Tu peux rencontrer des bugs ou des comportements inattendus.{'\n\n'}Si une analyse échoue ou semble bloquée, <Text style={betaStyles.bold}>n'hésite pas à réappuyer sur le bouton</Text> — ça suffit généralement à relancer.{'\n\n'}Merci pour ta patience et tes retours !
+            </Text>
+            <TouchableOpacity
+              style={betaStyles.btn}
+              onPress={() => setShowBetaBanner(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={betaStyles.btnText}>Compris, on y va →</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.historyBtn} onPress={() => router.push('/history' as any)}>
-            <Clock size={20} color={Colors.textMuted} />
+        {/* Navbar */}
+        <View style={styles.navbar}>
+          <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/profile' as any)}>
+            <UserCircle size={20} color={Colors.textPrimary} strokeWidth={1.5} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.profileBtn} onPress={() => router.push('/profile' as any)}>
-            <UserCircle size={22} color={Colors.textMuted} />
-          </TouchableOpacity>
-          <View style={styles.iconWrap}>
-            <Zap size={26} color={Colors.primary} strokeWidth={2.5} />
+
+          <View style={styles.logo}>
+            <Text style={styles.logoText}>P1</Text>
           </View>
+
+          <TouchableOpacity style={styles.navBtn} onPress={() => router.push('/history' as any)}>
+            <Menu size={20} color={Colors.textPrimary} strokeWidth={1.5} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Titre */}
+        <View style={styles.titleSection}>
           <Text style={styles.appName}>PickOne</Text>
           <Text style={styles.tagline}>Décide mieux. Regrette moins.</Text>
         </View>
 
-        {/* Card principale */}
+        {/* Bloc de saisie */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Décris ta situation</Text>
           <Text style={styles.cardHint}>
@@ -164,22 +200,19 @@ export default function HomeScreen() {
           </View>
 
           {isRecording && (
-            <Text style={styles.recordingHint}>
-              Appuie à nouveau pour arrêter
-            </Text>
+            <Text style={styles.recordingHint}>Appuie à nouveau pour arrêter</Text>
           )}
 
           {!isRecording && (
-            <View style={styles.charRow}>
-              <Text style={[styles.charCount, text.length < 20 && styles.charCountWarn]}>
-                {text.length} caractères {text.length < 20 ? '(min. 20)' : '✓'}
-              </Text>
-            </View>
+            <Text style={styles.charCount}>
+              {text.length} caractères{text.length < 20 ? ' (min. 20)' : ' ✓'}
+            </Text>
           )}
         </View>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+        {/* CTA */}
         <Pressable
           style={({ pressed }) => [
             styles.button,
@@ -198,9 +231,13 @@ export default function HomeScreen() {
           )}
         </Pressable>
 
-        <View style={styles.footerRow}>
-          <Text style={styles.footer}>3 étapes · ~2 min · Analyse IA complète</Text>
-          <AiBadge provider={aiProviders.appel1} />
+        {/* Métadonnées */}
+        <View style={styles.metaRow}>
+          <Text style={styles.meta}>3 étapes</Text>
+          <View style={styles.metaDot} />
+          <Text style={styles.meta}>~2 min</Text>
+          <View style={styles.metaDot} />
+          <Text style={styles.meta}>Analyse IA complète</Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -212,63 +249,86 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 1,
     paddingHorizontal: Spacing.lg,
-    paddingTop: 72,
+    paddingTop: 60,
     paddingBottom: Spacing['2xl'],
   },
-  header: { alignItems: 'center', marginBottom: Spacing['2xl'] },
-  historyBtn: { position: 'absolute', left: 0, top: 0, padding: Spacing.xs },
-  profileBtn: { position: 'absolute', right: 0, top: 0, padding: Spacing.xs },
-  iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.primary + '1A',
-    borderWidth: 1,
-    borderColor: Colors.primary + '50',
+
+  // Navbar
+  navbar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 32,
+  },
+  navBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: Colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.md,
+  },
+  logo: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.textPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+  },
+
+  // Titre
+  titleSection: {
+    alignItems: 'center',
+    marginBottom: 28,
   },
   appName: {
-    fontSize: Typography.fontSize3XL,
-    fontWeight: Typography.fontWeightBlack,
+    fontSize: 28,
+    fontWeight: '800' as const,
     color: Colors.textPrimary,
     letterSpacing: -1.5,
   },
   tagline: {
     fontSize: Typography.fontSizeSM,
     color: Colors.textMuted,
-    marginTop: Spacing.xs,
-    letterSpacing: 0.3,
+    marginTop: 6,
   },
+
+  // Bloc de saisie beige
   card: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.surfaceBeige,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.borderBeige,
     marginBottom: Spacing.lg,
     gap: Spacing.sm,
   },
   cardTitle: {
-    fontSize: Typography.fontSizeLG,
-    fontWeight: Typography.fontWeightBold,
+    fontSize: Typography.fontSizeSM,
+    fontWeight: Typography.fontWeightSemiBold,
     color: Colors.textPrimary,
   },
   cardHint: {
-    fontSize: Typography.fontSizeSM,
+    fontSize: Typography.fontSizeXS,
     color: Colors.textMuted,
-    lineHeight: Typography.fontSizeSM * 1.6,
+    lineHeight: 17,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.sm,
-    marginTop: Spacing.xs,
+    marginTop: 4,
   },
   textarea: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: BorderRadius.md,
@@ -288,9 +348,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.2,
   },
-  charRow: { alignItems: 'flex-end' },
-  charCount: { fontSize: Typography.fontSizeXS, color: Colors.success },
-  charCountWarn: { color: Colors.textMuted },
+  charCount: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.textMuted,
+    textAlign: 'right',
+  },
+
+  // Erreur
   errorText: {
     color: Colors.danger,
     fontSize: Typography.fontSizeSM,
@@ -298,12 +362,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     paddingHorizontal: Spacing.md,
   },
+
+  // Bouton CTA
   button: {
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.lg,
-    paddingVertical: Spacing.md + 2,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginBottom: Spacing.md,
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   buttonDim: { opacity: 0.45 },
   buttonText: {
@@ -313,11 +380,85 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  footerRow: { alignItems: 'center', gap: Spacing.sm },
-  footer: {
-    textAlign: 'center',
+
+  // Métadonnées
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  meta: {
     fontSize: Typography.fontSizeXS,
     color: Colors.textMuted,
-    letterSpacing: 0.3,
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: Colors.textMuted,
+  },
+});
+
+const betaStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: '#00000060',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.lg,
+    paddingBottom: 40,
+    gap: Spacing.md,
+  },
+  badgeRow: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  badge: {
+    backgroundColor: Colors.primaryPale,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Colors.primary + '40',
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: Colors.primary,
+    letterSpacing: 1.5,
+  },
+  title: {
+    fontSize: Typography.fontSizeLG,
+    fontWeight: '700' as const,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    letterSpacing: -0.3,
+  },
+  body: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textSecondary,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  bold: {
+    fontWeight: '700' as const,
+    color: Colors.textPrimary,
+  },
+  btn: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  btnText: {
+    color: '#fff',
+    fontSize: Typography.fontSizeMD,
+    fontWeight: '700' as const,
   },
 });

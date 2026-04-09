@@ -154,7 +154,7 @@ const inputStyles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   choiceBtnActive: {
-    backgroundColor: Colors.primary + '20',
+    backgroundColor: Colors.primaryPale,
     borderColor: Colors.primary,
   },
   choiceBtnText: {
@@ -162,7 +162,7 @@ const inputStyles = StyleSheet.create({
     color: Colors.textSecondary,
   },
   choiceBtnTextActive: {
-    color: Colors.primaryLight,
+    color: Colors.primary,
     fontWeight: Typography.fontWeightSemiBold,
   },
   openWrap: {
@@ -172,7 +172,7 @@ const inputStyles = StyleSheet.create({
   },
   openInput: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceGray,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: BorderRadius.md,
@@ -472,14 +472,12 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   backBtn: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderRadius: 10,
+    backgroundColor: Colors.surfaceElevated,
   },
   backBtnHidden: {
     opacity: 0,
@@ -490,7 +488,7 @@ const styles = StyleSheet.create({
   },
   progressTrack: {
     height: 4,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceElevated,
     borderRadius: BorderRadius.full,
     overflow: 'hidden',
   },
@@ -512,7 +510,7 @@ const styles = StyleSheet.create({
   },
   contextPill: {
     alignSelf: 'flex-start',
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceElevated,
     borderRadius: BorderRadius.full,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
@@ -532,7 +530,7 @@ const styles = StyleSheet.create({
   },
   questionCard: {
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.xl,
+    borderRadius: BorderRadius.lg,
     padding: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -540,11 +538,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepBadge: {
-    fontSize: Typography.fontSizeXS,
+    fontSize: 10,
     fontWeight: Typography.fontWeightSemiBold,
-    color: Colors.primaryLight,
+    color: Colors.primary,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
   questionText: {
     fontSize: Typography.fontSizeXL,
@@ -566,7 +564,7 @@ const styles = StyleSheet.create({
   },
   skipBtn: {
     flex: 1,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.md,
     paddingVertical: Spacing.md,
     alignItems: 'center',
     borderWidth: 1,
@@ -580,7 +578,7 @@ const styles = StyleSheet.create({
     flex: 2.5,
     flexDirection: 'row',
     backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.md,
     paddingVertical: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',

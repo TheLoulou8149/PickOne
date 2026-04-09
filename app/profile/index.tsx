@@ -9,10 +9,12 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, User, Lock, Brain, Check } from 'lucide-react-native';
+import { ArrowLeft, User, Lock, Brain, Check, MessageSquare } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -265,7 +267,7 @@ function Divider() {
 const tabStyles = StyleSheet.create({
   container: { gap: Spacing.md },
   infoCard: {
-    backgroundColor: Colors.surface, borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.surface, borderRadius: BorderRadius.md,
     padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: Spacing.xs },
@@ -275,7 +277,7 @@ const tabStyles = StyleSheet.create({
   fieldLabel: { fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightSemiBold, color: Colors.textPrimary, marginBottom: 2 },
   fieldHint: { fontSize: Typography.fontSizeXS, color: Colors.textMuted, marginBottom: Spacing.xs },
   input: {
-    backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.surfaceGray, borderWidth: 1, borderColor: Colors.border,
     borderRadius: BorderRadius.sm, color: Colors.textPrimary,
     fontSize: Typography.fontSizeSM, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
   },
@@ -284,13 +286,13 @@ const tabStyles = StyleSheet.create({
     lineHeight: Typography.fontSizeSM * 1.6,
   },
   primaryBtn: {
-    backgroundColor: Colors.primary, borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
     paddingVertical: Spacing.md, alignItems: 'center',
   },
   btnDim: { opacity: 0.45 },
   primaryBtnText: { color: '#fff', fontSize: Typography.fontSizeMD, fontWeight: Typography.fontWeightBold },
   dangerBtn: {
-    borderWidth: 1, borderColor: Colors.danger + '50', borderRadius: BorderRadius.lg,
+    borderWidth: 1, borderColor: Colors.danger + '50', borderRadius: BorderRadius.md,
     paddingVertical: Spacing.md, alignItems: 'center', backgroundColor: Colors.danger + '08',
   },
   dangerBtnText: { color: Colors.danger, fontSize: Typography.fontSizeMD, fontWeight: Typography.fontWeightSemiBold },
@@ -304,9 +306,29 @@ const tabStyles = StyleSheet.create({
 export default function ProfileScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>('compte');
+  const [showFeedback, setShowFeedback] = useState(false);
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+
+      {/* Modal feedback bientôt disponible */}
+      <Modal visible={showFeedback} transparent animationType="fade" onRequestClose={() => setShowFeedback(false)}>
+        <Pressable style={feedbackStyles.overlay} onPress={() => setShowFeedback(false)}>
+          <View style={feedbackStyles.sheet}>
+            <View style={feedbackStyles.iconWrap}>
+              <MessageSquare size={28} color={Colors.primary} strokeWidth={1.5} />
+            </View>
+            <Text style={feedbackStyles.title}>Bientôt disponible</Text>
+            <Text style={feedbackStyles.body}>
+              Le formulaire de signalement de bugs et de suggestions arrive prochainement.{'\n\n'}En attendant, merci pour ta patience — chaque retour compte !
+            </Text>
+            <TouchableOpacity style={feedbackStyles.btn} onPress={() => setShowFeedback(false)} activeOpacity={0.85}>
+              <Text style={feedbackStyles.btnText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
@@ -339,6 +361,12 @@ export default function ProfileScreen() {
         {activeTab === 'compte' && <TabCompte />}
         {activeTab === 'password' && <TabPassword />}
         {activeTab === 'contexte' && <TabContexte />}
+
+        {/* Feedback */}
+        <TouchableOpacity style={styles.feedbackBtn} onPress={() => setShowFeedback(true)} activeOpacity={0.75}>
+          <MessageSquare size={15} color={Colors.textMuted} strokeWidth={1.5} />
+          <Text style={styles.feedbackText}>Signaler un bug ou faire une suggestion</Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -351,7 +379,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg, paddingTop: 56, paddingBottom: Spacing.md,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  backBtn: { padding: Spacing.xs },
+  backBtn: {
+    width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+    borderRadius: 10, backgroundColor: Colors.surfaceElevated,
+  },
   title: { fontSize: Typography.fontSizeLG, fontWeight: Typography.fontWeightBold, color: Colors.textPrimary },
   tabBar: {
     flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: Colors.border,
@@ -365,5 +396,71 @@ const styles = StyleSheet.create({
   tabActive: { borderBottomColor: Colors.primary },
   tabLabel: { fontSize: Typography.fontSizeXS, color: Colors.textMuted, fontWeight: Typography.fontWeightSemiBold },
   tabLabelActive: { color: Colors.primary },
-  content: { padding: Spacing.lg, paddingBottom: Spacing['3xl'] },
+  content: { padding: Spacing.lg, paddingBottom: Spacing['3xl'], gap: Spacing.md },
+  feedbackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: Spacing.sm,
+  },
+  feedbackText: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textMuted,
+  },
+});
+
+const feedbackStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: '#00000060',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  sheet: {
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    alignItems: 'center',
+    width: '100%',
+  },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryPale,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  title: {
+    fontSize: Typography.fontSizeLG,
+    fontWeight: '700' as const,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  body: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textSecondary,
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  btn: {
+    backgroundColor: Colors.primary,
+    borderRadius: BorderRadius.md,
+    paddingVertical: 13,
+    paddingHorizontal: 40,
+    marginTop: 4,
+  },
+  btnText: {
+    color: '#fff',
+    fontSize: Typography.fontSizeMD,
+    fontWeight: '700' as const,
+  },
 });

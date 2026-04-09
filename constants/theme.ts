@@ -1,18 +1,22 @@
 export const Colors = {
   // Fonds
-  background: '#F4F4F6',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceElevated: '#E7E7E7',
-  border: '#E7E7E7',
+  surfaceElevated: '#F0EFED',
+  surfaceGray: '#F7F6F3',
+  surfaceBeige: '#F5F0E8',
+  border: '#E8E8E8',
+  borderBeige: '#DDD8CE',
 
-  // Primaire — Orange
-  primary: '#FF634A',
-  primaryLight: '#FFA494',
-  primaryDark: '#E64C33',
+  // Primaire — Orange vif
+  primary: '#E8532A',
+  primaryLight: '#F4A58A',
+  primaryPale: '#FDF1ED',
+  primaryDark: '#C94420',
 
   // Accent
-  accent: '#FF634A',
-  accentLight: '#FFA494',
+  accent: '#E8532A',
+  accentLight: '#F4A58A',
 
   // Regret Mode
   danger: '#EF4444',
@@ -27,8 +31,8 @@ export const Colors = {
   warningLight: '#FCD34D',
 
   // Textes
-  textPrimary: '#272727', // Gris sombre (corrigé de #E7E7E7 pour rester lisible)
-  textSecondary: '#7E7E7E',
+  textPrimary: '#1A1A18',
+  textSecondary: '#6B6B6B',
   textMuted: '#A1A1A1',
 
   // Scores
@@ -50,6 +54,7 @@ export const Typography = {
   fontWeightMedium: '500' as const,
   fontWeightSemiBold: '600' as const,
   fontWeightBold: '700' as const,
+  fontWeightExtraBold: '800' as const,
   fontWeightBlack: '900' as const,
 
   lineHeightTight: 1.2,

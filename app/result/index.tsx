@@ -10,220 +10,453 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
   RotateCcw,
-  AlertTriangle,
-  Eye,
-  HelpCircle,
-  ChevronDown,
-  ChevronUp,
   CheckCircle,
   AlertCircle,
   Minus,
-  Lightbulb,
 } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { AiBadge } from '@/components/AiBadge';
 
-// ─── Couleurs niveau de reco ───────────────────────────────────────────────────
+// ─── 1. Verdict ───────────────────────────────────────────────────────────────
 
-const NIVEAU_COLOR = {
-  serré: '#F59E0B',
-  léger: '#3B82F6',
-  clair: '#10B981',
-} as const;
-
-// ─── Section wrapper ───────────────────────────────────────────────────────────
-
-function Section({
-  children,
-  style,
+function VerdictCard({
+  label,
+  reason,
 }: {
-  children: React.ReactNode;
-  style?: object;
+  label: string;
+  reason: string;
 }) {
   return (
-    <View style={[sectionStyles.wrap, style]}>
-      {children}
+    <View style={verdictStyles.card}>
+      <Text style={verdictStyles.micro}>VERDICT</Text>
+      <Text style={verdictStyles.title}>{label}</Text>
+      <Text style={verdictStyles.reason}>{reason}</Text>
     </View>
   );
 }
 
-const sectionStyles = StyleSheet.create({
-  wrap: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: Spacing.md,
+const verdictStyles = StyleSheet.create({
+  card: {
+    borderLeftWidth: 2,
+    borderLeftColor: Colors.primary,
+    borderTopWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    backgroundColor: Colors.primaryPale,
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    paddingVertical: 16,
+    paddingRight: 16,
+    paddingLeft: 14,
+    gap: 6,
   },
-});
-
-function SectionTitle({ children, color }: { children: string; color?: string }) {
-  return (
-    <Text style={[titleStyles.text, color ? { color } : null]}>
-      {children}
-    </Text>
-  );
-}
-
-const titleStyles = StyleSheet.create({
-  text: {
-    fontSize: Typography.fontSizeXS,
-    fontWeight: Typography.fontWeightSemiBold,
-    color: Colors.textMuted,
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.primary,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    letterSpacing: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: Colors.textPrimary,
+    lineHeight: 22,
+  },
+  reason: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textSecondary,
+    lineHeight: 20,
   },
 });
 
-// ─── 1. Niveau de recommandation ──────────────────────────────────────────────
-
-function NiveauCard({
-  niveau,
-  label,
-  reason,
-}: {
-  niveau: 'serré' | 'léger' | 'clair';
-  label: string;
-  reason: string;
-}) {
-  const color = NIVEAU_COLOR[niveau];
-  return (
-    <Section style={{ borderColor: color + '50', backgroundColor: color + '0D' }}>
-      <View style={niveauStyles.badge}>
-        <View style={[niveauStyles.dot, { backgroundColor: color }]} />
-        <Text style={[niveauStyles.label, { color }]}>{label}</Text>
-      </View>
-      <Text style={niveauStyles.reason}>{reason}</Text>
-    </Section>
-  );
-}
-
-const niveauStyles = StyleSheet.create({
-  badge: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  label: { fontSize: Typography.fontSizeLG, fontWeight: Typography.fontWeightBold },
-  reason: { fontSize: Typography.fontSizeSM, color: Colors.textSecondary, lineHeight: Typography.fontSizeSM * 1.6 },
-});
-
-// ─── 2. Scores (multi-options) ────────────────────────────────────────────────
+// ─── 2. Scores ────────────────────────────────────────────────────────────────
 
 function ScoresCard({
   options,
   scores,
-  winner,
 }: {
   options: { id: string; label: string }[];
   scores: Record<string, number>;
-  winner: string;
 }) {
-  // Trier par score décroissant
   const sorted = [...options].sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
 
   return (
-    <Section>
-      <SectionTitle>Scores pondérés</SectionTitle>
+    <View style={scoresStyles.card}>
+      <Text style={scoresStyles.micro}>SCORES PONDÉRÉS</Text>
       {sorted.map((opt, rank) => {
         const score = scores[opt.id] ?? 0;
-        const isWinner = opt.label === winner;
-        const color = isWinner ? Colors.primary : Colors.textMuted;
+        const isFirst = rank === 0;
+        const rankColor = isFirst ? Colors.primary : Colors.textMuted;
+        const barColor = isFirst ? Colors.textPrimary : '#D1D1D1';
         return (
-          <View key={opt.id} style={scoresStyles.gaugeBlock}>
-            <View style={scoresStyles.gaugeHeader}>
-              <View style={scoresStyles.nameRow}>
-                {rank === 0 && <Text style={scoresStyles.rankBadge}>#1</Text>}
-                <Text style={[scoresStyles.gaugeName, { color }]}>{opt.label}</Text>
-              </View>
-              <View style={scoresStyles.gaugeScoreWrap}>
-                <Text style={[scoresStyles.gaugeScore, { color }]}>{score}</Text>
-                <Text style={scoresStyles.gaugeMax}>/100</Text>
+          <View key={opt.id} style={scoresStyles.row}>
+            <View style={scoresStyles.rowHeader}>
+              <Text style={[scoresStyles.rank, { color: rankColor }]}>#{rank + 1}</Text>
+              <Text style={scoresStyles.name} numberOfLines={1}>{opt.label}</Text>
+              <View style={scoresStyles.scoreWrap}>
+                <Text style={scoresStyles.scoreNum}>{score}</Text>
+                <Text style={scoresStyles.scoreMax}>/100</Text>
               </View>
             </View>
             <View style={scoresStyles.track}>
-              <View style={[scoresStyles.fill, { width: `${score}%`, backgroundColor: color }]} />
+              <View style={[scoresStyles.fill, { width: `${score}%` as any, backgroundColor: barColor }]} />
             </View>
-            {isWinner && <Text style={scoresStyles.winnerTag}>Meilleur score</Text>}
           </View>
         );
       })}
-    </Section>
+      <Text style={scoresStyles.note}>Scores calculés selon tes priorités personnalisées</Text>
+    </View>
   );
 }
 
 const scoresStyles = StyleSheet.create({
-  gaugeBlock: {
-    gap: Spacing.xs,
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 12,
   },
-  gaugeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
-  nameRow: {
+  row: { gap: 8 },
+  rowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: 8,
+  },
+  rank: {
+    fontSize: Typography.fontSizeSM,
+    fontWeight: Typography.fontWeightBold,
+    width: 24,
+  },
+  name: {
     flex: 1,
-    flexWrap: 'wrap',
-  },
-  rankBadge: {
-    fontSize: Typography.fontSizeXS,
-    fontWeight: Typography.fontWeightBold,
-    color: Colors.primary,
-    backgroundColor: Colors.primary + '20',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  gaugeName: {
     fontSize: Typography.fontSizeMD,
-    fontWeight: Typography.fontWeightBold,
+    fontWeight: Typography.fontWeightMedium,
+    color: Colors.textPrimary,
   },
-  gaugeScoreWrap: {
+  scoreWrap: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 2,
-    marginLeft: Spacing.sm,
   },
-  gaugeScore: {
-    fontSize: Typography.fontSize3XL,
-    fontWeight: Typography.fontWeightBlack,
-    lineHeight: Typography.fontSize3XL * 1.1,
+  scoreNum: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: Colors.textPrimary,
+    letterSpacing: -0.5,
   },
-  gaugeMax: {
+  scoreMax: {
     fontSize: Typography.fontSizeSM,
     color: Colors.textMuted,
   },
   track: {
-    height: 10,
-    backgroundColor: Colors.border,
-    borderRadius: BorderRadius.full,
+    height: 3,
+    backgroundColor: '#EFEFEF',
+    borderRadius: 2,
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
-    borderRadius: BorderRadius.full,
+    borderRadius: 2,
   },
-  winnerTag: {
+  note: {
     fontSize: Typography.fontSizeXS,
-    color: Colors.primary,
-    fontWeight: Typography.fontWeightSemiBold,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
   },
 });
 
-// ─── 3. Cohérence instinct / logique ──────────────────────────────────────────
+// ─── 3. Simulation de regret (side by side) ───────────────────────────────────
+
+function RegretSection({
+  chosenScore,
+  otherScore,
+  chosenLabel,
+  otherLabel,
+  chosenReason,
+  otherReason,
+}: {
+  chosenScore: number;
+  otherScore: number;
+  chosenLabel: string;
+  otherLabel: string;
+  chosenReason: string;
+  otherReason: string;
+}) {
+  return (
+    <View style={regretStyles.section}>
+      <Text style={regretStyles.micro}>SIMULATION DE REGRET</Text>
+      <View style={regretStyles.row}>
+        {/* Carte recommandée (gauche) */}
+        <View style={[regretStyles.card, regretStyles.cardRecommended]}>
+          <View style={regretStyles.pill}>
+            <Text style={regretStyles.pillText}>Recommandé</Text>
+          </View>
+          <Text style={regretStyles.optionName} numberOfLines={2}>{chosenLabel}</Text>
+          <Text style={regretStyles.scoreBlack}>{chosenScore}%</Text>
+          <Text style={regretStyles.scoreLabel}>risque de regret dans 1 an</Text>
+          {chosenReason ? (
+            <Text style={regretStyles.reason}>{chosenReason}</Text>
+          ) : null}
+        </View>
+
+        {/* Carte autre option (droite) */}
+        <View style={regretStyles.card}>
+          <View style={regretStyles.pillPlaceholder} />
+          <Text style={regretStyles.optionName} numberOfLines={2}>{otherLabel}</Text>
+          <Text style={regretStyles.scoreOrange}>{otherScore}%</Text>
+          <Text style={regretStyles.scoreLabel}>risque de regret dans 1 an</Text>
+          {otherReason ? (
+            <Text style={regretStyles.reason}>{otherReason}</Text>
+          ) : null}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const regretStyles = StyleSheet.create({
+  section: {
+    gap: 10,
+  },
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  card: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  cardRecommended: {
+    borderColor: Colors.textPrimary,
+  },
+  pill: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.primaryPale,
+    borderRadius: BorderRadius.full,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.primary + '40',
+  },
+  pillText: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.primary,
+  },
+  pillPlaceholder: {
+    height: 22,
+  },
+  optionName: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.textMuted,
+    lineHeight: 16,
+  },
+  scoreBlack: {
+    fontSize: 26,
+    fontWeight: '700' as const,
+    color: Colors.textPrimary,
+    letterSpacing: -1,
+    lineHeight: 30,
+  },
+  scoreOrange: {
+    fontSize: 26,
+    fontWeight: '700' as const,
+    color: Colors.primary,
+    letterSpacing: -1,
+    lineHeight: 30,
+  },
+  scoreLabel: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    lineHeight: 14,
+  },
+  reason: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+});
+
+// ─── 4. Biais détectés (pills) ────────────────────────────────────────────────
+
+function BiasPills({ biases }: { biases: { name: string; explanation: string }[] }) {
+  const [expanded, setExpanded] = useState<number | null>(null);
+  return (
+    <View style={pillsStyles.section}>
+      <Text style={pillsStyles.micro}>BIAIS DÉTECTÉS</Text>
+      <View style={pillsStyles.row}>
+        {biases.map((b, i) => (
+          <TouchableOpacity
+            key={i}
+            style={[pillsStyles.pill, expanded === i && pillsStyles.pillActive]}
+            onPress={() => setExpanded(expanded === i ? null : i)}
+            activeOpacity={0.7}
+          >
+            <View style={pillsStyles.dot} />
+            <Text style={pillsStyles.pillText}>{b.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {expanded !== null && (
+        <Text style={pillsStyles.explanation}>{biases[expanded].explanation}</Text>
+      )}
+    </View>
+  );
+}
+
+const pillsStyles = StyleSheet.create({
+  section: { gap: 10 },
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  row: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pillActive: {
+    borderColor: Colors.textSecondary,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.textMuted,
+  },
+  pillText: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textSecondary,
+    fontWeight: Typography.fontWeightMedium,
+  },
+  explanation: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+    paddingHorizontal: 4,
+  },
+});
+
+// ─── 5. Angle mort ────────────────────────────────────────────────────────────
+
+function BlindspotCard({ text }: { text: string }) {
+  return (
+    <View style={blindStyles.card}>
+      <Text style={blindStyles.micro}>ANGLE MORT</Text>
+      <Text style={blindStyles.text}>{text}</Text>
+    </View>
+  );
+}
+
+const blindStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surfaceGray,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 8,
+  },
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  text: {
+    fontSize: 11,
+    color: Colors.textPrimary,
+    lineHeight: 17,
+  },
+});
+
+// ─── 6. Question finale ───────────────────────────────────────────────────────
+
+function DecidingQuestion({ question }: { question: string }) {
+  return (
+    <View style={dqStyles.card}>
+      <Text style={dqStyles.micro}>LA QUESTION QUI TRANCHE</Text>
+      <Text style={dqStyles.question}>{question}</Text>
+    </View>
+  );
+}
+
+const dqStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#1A1A18',
+    borderRadius: BorderRadius.md,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+  },
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: '#F4A58A',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  question: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: Typography.fontWeightSemiBold,
+    lineHeight: 22,
+  },
+});
+
+// ─── Cohérence instinct / logique ─────────────────────────────────────────────
 
 function CoherenceCard({ message }: { message: string }) {
   const isAccord = message.includes('même sens');
   const isNeutre = message.includes("pas de préférence");
 
   const icon = isAccord ? (
-    <CheckCircle size={18} color={Colors.success} />
+    <CheckCircle size={16} color={Colors.success} />
   ) : isNeutre ? (
-    <Minus size={18} color={Colors.warning} />
+    <Minus size={16} color={Colors.warning} />
   ) : (
-    <AlertCircle size={18} color={Colors.warning} />
+    <AlertCircle size={16} color={Colors.warning} />
   );
 
   return (
@@ -239,7 +472,7 @@ const coherenceStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: Spacing.sm,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surfaceGray,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     borderWidth: 1,
@@ -253,7 +486,7 @@ const coherenceStyles = StyleSheet.create({
   },
 });
 
-// ─── 4. Baromètres critères ───────────────────────────────────────────────────
+// ─── Baromètres critères ──────────────────────────────────────────────────────
 
 function CriteriaBarometers({
   criteria,
@@ -263,8 +496,8 @@ function CriteriaBarometers({
   weights: Record<string, number>;
 }) {
   return (
-    <Section>
-      <SectionTitle>Critères analysés</SectionTitle>
+    <View style={bmStyles.card}>
+      <Text style={bmStyles.micro}>CRITÈRES ANALYSÉS</Text>
       {criteria.map((c) => {
         const w = weights[c.id] ?? c.default_weight;
         return (
@@ -272,41 +505,54 @@ function CriteriaBarometers({
             <Text style={bmStyles.label}>{c.label}</Text>
             <View style={bmStyles.barWrap}>
               <View style={bmStyles.barTrack}>
-                <View style={[bmStyles.barFill, { width: `${w * 10}%` }]} />
+                <View style={[bmStyles.barFill, { width: `${w * 10}%` as any }]} />
               </View>
             </View>
             <Text style={bmStyles.value}>{w}</Text>
           </View>
         );
       })}
-    </Section>
+    </View>
   );
 }
 
 const bmStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 10,
+  },
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.textMuted,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: Spacing.sm,
   },
   label: {
     flex: 1.5,
     fontSize: Typography.fontSizeSM,
     color: Colors.textSecondary,
-    fontWeight: Typography.fontWeightSemiBold,
+    fontWeight: Typography.fontWeightMedium,
   },
-  barWrap: {
-    flex: 2,
-  },
+  barWrap: { flex: 2 },
   barTrack: {
-    height: 6,
+    height: 4,
     backgroundColor: Colors.border,
     borderRadius: BorderRadius.full,
     overflow: 'hidden',
   },
   barFill: {
     height: '100%',
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.textPrimary,
     borderRadius: BorderRadius.full,
   },
   value: {
@@ -318,131 +564,12 @@ const bmStyles = StyleSheet.create({
   },
 });
 
-// ─── 5. Biais ─────────────────────────────────────────────────────────────────
-
-function BiasCard({ bias }: { bias: { name: string; explanation: string } }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <TouchableOpacity
-      style={biasStyles.card}
-      onPress={() => setExpanded(!expanded)}
-      activeOpacity={0.8}
-    >
-      <View style={biasStyles.header}>
-        <View style={biasStyles.titleRow}>
-          <AlertTriangle size={14} color={Colors.warning} />
-          <Text style={biasStyles.name}>{bias.name}</Text>
-        </View>
-        {expanded ? <ChevronUp size={14} color={Colors.textMuted} /> : <ChevronDown size={14} color={Colors.textMuted} />}
-      </View>
-      {expanded && (
-        <Text style={biasStyles.explanation}>{bias.explanation}</Text>
-      )}
-    </TouchableOpacity>
-  );
-}
-
-const biasStyles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.sm,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.warning + '40',
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.warning,
-    gap: Spacing.sm,
-  },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  name: { fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightSemiBold, color: Colors.warning },
-  explanation: { fontSize: Typography.fontSizeSM, color: Colors.textSecondary, lineHeight: Typography.fontSizeSM * 1.6 },
-});
-
-// ─── 6-7. Regret ──────────────────────────────────────────────────────────────
-
-function RegretCard({
-  score,
-  reason,
-  optionLabel,
-  isChosen,
-}: {
-  score: number;
-  reason: string;
-  optionLabel: string;
-  isChosen: boolean;
-}) {
-  const color = score >= 60 ? Colors.danger : score >= 40 ? Colors.warning : Colors.success;
-  return (
-    <View style={[regretStyles.card, { borderColor: color + '40' }]}>
-      <View style={regretStyles.header}>
-        <Text style={regretStyles.optionLabel}>{optionLabel}</Text>
-        {isChosen && <View style={regretStyles.chosenBadge}><Text style={regretStyles.chosenText}>Recommandé</Text></View>}
-      </View>
-      <View style={regretStyles.scoreRow}>
-        <Text style={[regretStyles.score, { color }]}>{score}%</Text>
-        <Text style={regretStyles.scoreLabel}>risque de regret</Text>
-      </View>
-      <Text style={regretStyles.reason}>{reason}</Text>
-    </View>
-  );
-}
-
-const regretStyles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.background,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    borderWidth: 1,
-    gap: Spacing.sm,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  optionLabel: { fontSize: Typography.fontSizeMD, fontWeight: Typography.fontWeightBold, color: Colors.textPrimary, flex: 1 },
-  chosenBadge: { backgroundColor: Colors.success + '20', borderRadius: BorderRadius.full, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderWidth: 1, borderColor: Colors.success + '40' },
-  chosenText: { fontSize: Typography.fontSizeXS, color: Colors.success, fontWeight: Typography.fontWeightSemiBold },
-  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.xs },
-  score: { fontSize: Typography.fontSize3XL, fontWeight: Typography.fontWeightBlack },
-  scoreLabel: { fontSize: Typography.fontSizeSM, color: Colors.textMuted },
-  reason: { fontSize: Typography.fontSizeSM, color: Colors.textSecondary, lineHeight: Typography.fontSizeSM * 1.6, fontStyle: 'italic' },
-});
-
-// ─── 8. Angle mort ────────────────────────────────────────────────────────────
-
-function BlindspotCard({ text }: { text: string }) {
-  return (
-    <View style={blindStyles.card}>
-      <View style={blindStyles.header}>
-        <Eye size={16} color={Colors.accent} />
-        <Text style={blindStyles.title}>Angle mort</Text>
-      </View>
-      <Text style={blindStyles.text}>{text}</Text>
-    </View>
-  );
-}
-
-const blindStyles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.accent + '30',
-    gap: Spacing.sm,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  title: { fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightSemiBold, color: Colors.accent, textTransform: 'uppercase', letterSpacing: 0.5 },
-  text: { fontSize: Typography.fontSizeMD, color: Colors.textSecondary, lineHeight: Typography.fontSizeMD * 1.6 },
-});
-
 // ─── Plan B ───────────────────────────────────────────────────────────────────
 
 function PlanBCard({ text }: { text: string }) {
   return (
     <View style={planBStyles.card}>
-      <View style={planBStyles.header}>
-        <Lightbulb size={18} color="#A855F7" />
-        <Text style={planBStyles.title}>Et si tu faisais tout autre chose ?</Text>
-      </View>
+      <Text style={planBStyles.micro}>ET SI TU FAISAIS TOUT AUTRE CHOSE ?</Text>
       <Text style={planBStyles.text}>{text}</Text>
     </View>
   );
@@ -450,63 +577,25 @@ function PlanBCard({ text }: { text: string }) {
 
 const planBStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#A855F714',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.lg,
+    backgroundColor: Colors.surfaceGray,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
     borderWidth: 1,
-    borderColor: '#A855F740',
-    gap: Spacing.sm,
+    borderColor: Colors.border,
+    gap: 8,
   },
-  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  title: {
-    fontSize: Typography.fontSizeSM,
-    fontWeight: Typography.fontWeightSemiBold,
-    color: '#A855F7',
+  micro: {
+    fontSize: 10,
+    fontWeight: '600' as const,
+    color: Colors.textSecondary,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    flex: 1,
   },
   text: {
-    fontSize: Typography.fontSizeMD,
+    fontSize: Typography.fontSizeSM,
     color: Colors.textSecondary,
-    lineHeight: Typography.fontSizeMD * 1.6,
+    lineHeight: Typography.fontSizeSM * 1.6,
     fontStyle: 'italic',
-  },
-});
-
-// ─── 9. Question finale ───────────────────────────────────────────────────────
-
-function DecidingQuestion({ question }: { question: string }) {
-  return (
-    <View style={dqStyles.card}>
-      <View style={dqStyles.iconRow}>
-        <HelpCircle size={18} color={Colors.primaryLight} />
-        <Text style={dqStyles.label}>La question qui tranche tout</Text>
-      </View>
-      <Text style={dqStyles.question}>{question}</Text>
-    </View>
-  );
-}
-
-const dqStyles = StyleSheet.create({
-  card: {
-    backgroundColor: Colors.primary + '12',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Colors.primary + '40',
-    gap: Spacing.md,
-    alignItems: 'center',
-  },
-  iconRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  label: { fontSize: Typography.fontSizeXS, color: Colors.primaryLight, fontWeight: Typography.fontWeightSemiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
-  question: {
-    fontSize: Typography.fontSizeLG,
-    color: Colors.textPrimary,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    lineHeight: Typography.fontSizeLG * 1.5,
-    fontWeight: Typography.fontWeightSemiBold,
   },
 });
 
@@ -548,7 +637,6 @@ export default function ResultScreen() {
         console.error('[PickOne] Erreur sauvegarde décision:', error.message, error.code);
       } else {
         console.log('[PickOne] Décision sauvegardée ✓');
-        // Incrémenter le compteur all-time dans user_stats
         const { data: stats } = await supabase
           .from('user_stats')
           .select('total_decisions')
@@ -564,7 +652,6 @@ export default function ResultScreen() {
     });
   }, [analysis]);
 
-  // Options triées par score décroissant
   const sortedOptions = [...store.options].sort(
     (a, b) => (store.scores[b.id] ?? 0) - (store.scores[a.id] ?? 0)
   );
@@ -577,10 +664,9 @@ export default function ResultScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      {/* 1. Niveau de recommandation */}
+      {/* 1. Verdict */}
       {store.labelNiveau ? (
-        <NiveauCard
-          niveau={store.niveauReco}
+        <VerdictCard
           label={store.labelNiveau}
           reason={analysis?.recommendation_reason ?? ''}
         />
@@ -590,15 +676,36 @@ export default function ResultScreen() {
       <ScoresCard
         options={store.options}
         scores={store.scores}
-        winner={store.winner}
       />
 
-      {/* 3. Cohérence instinct / logique */}
+      {/* 3. Simulation de regret */}
+      {analysis ? (
+        <RegretSection
+          chosenScore={analysis.regret_score_chosen}
+          otherScore={analysis.regret_score_other}
+          chosenLabel={chosenLabel}
+          otherLabel={otherLabel}
+          chosenReason={analysis.regret_chosen_reason ?? ''}
+          otherReason={analysis.regret_other_reason ?? ''}
+        />
+      ) : null}
+
+      {/* 4. Biais détectés */}
+      {analysis?.biases && analysis.biases.length > 0 ? (
+        <BiasPills biases={analysis.biases} />
+      ) : null}
+
+      {/* 5. Angle mort */}
+      {analysis?.blindspot ? (
+        <BlindspotCard text={analysis.blindspot} />
+      ) : null}
+
+      {/* Cohérence instinct / logique */}
       {store.messageCoherence ? (
         <CoherenceCard message={store.messageCoherence} />
       ) : null}
 
-      {/* 4. Baromètres critères */}
+      {/* Baromètres critères */}
       {store.criteria.length > 0 ? (
         <CriteriaBarometers
           criteria={store.criteria}
@@ -606,46 +713,12 @@ export default function ResultScreen() {
         />
       ) : null}
 
-      {/* 5. Biais */}
-      {analysis?.biases && analysis.biases.length > 0 ? (
-        <Section>
-          <SectionTitle color={Colors.warning}>Biais détectés</SectionTitle>
-          {analysis.biases.map((b, i) => (
-            <BiasCard key={i} bias={b} />
-          ))}
-        </Section>
-      ) : null}
-
-      {/* 6-7. Regret */}
-      {analysis ? (
-        <Section style={{ gap: Spacing.sm }}>
-          <SectionTitle>Simulation de regret</SectionTitle>
-          <RegretCard
-            score={analysis.regret_score_chosen}
-            reason={analysis.regret_chosen_reason}
-            optionLabel={chosenLabel}
-            isChosen
-          />
-          <RegretCard
-            score={analysis.regret_score_other}
-            reason={analysis.regret_other_reason}
-            optionLabel={otherLabel}
-            isChosen={false}
-          />
-        </Section>
-      ) : null}
-
-      {/* 8. Angle mort */}
-      {analysis?.blindspot ? (
-        <BlindspotCard text={analysis.blindspot} />
-      ) : null}
-
       {/* Plan B */}
       {analysis?.alternative_strategy ? (
         <PlanBCard text={analysis.alternative_strategy} />
       ) : null}
 
-      {/* 9. Question finale */}
+      {/* 6. Question finale */}
       {analysis?.deciding_question ? (
         <DecidingQuestion question={analysis.deciding_question} />
       ) : null}
@@ -662,7 +735,7 @@ export default function ResultScreen() {
         }}
         activeOpacity={0.8}
       >
-        <RotateCcw size={15} color={Colors.textMuted} />
+        <RotateCcw size={14} color={Colors.textMuted} />
         <Text style={styles.restartText}>Nouveau dilemme</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -686,10 +759,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
     borderColor: Colors.border,
-    marginTop: Spacing.md,
+    marginTop: Spacing.sm,
   },
   restartText: {
     fontSize: Typography.fontSizeSM,
