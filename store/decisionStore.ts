@@ -36,6 +36,7 @@ export interface Analysis {
   regret_other_reason: string;
   blindspot: string;
   deciding_question: string;
+  alternative_strategy?: string;
 }
 
 export interface DecisionState {

@@ -18,6 +18,7 @@ import {
   CheckCircle,
   AlertCircle,
   Minus,
+  Lightbulb,
 } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
@@ -433,6 +434,46 @@ const blindStyles = StyleSheet.create({
   text: { fontSize: Typography.fontSizeMD, color: Colors.textSecondary, lineHeight: Typography.fontSizeMD * 1.6 },
 });
 
+// ─── Plan B ───────────────────────────────────────────────────────────────────
+
+function PlanBCard({ text }: { text: string }) {
+  return (
+    <View style={planBStyles.card}>
+      <View style={planBStyles.header}>
+        <Lightbulb size={18} color="#A855F7" />
+        <Text style={planBStyles.title}>Et si tu faisais tout autre chose ?</Text>
+      </View>
+      <Text style={planBStyles.text}>{text}</Text>
+    </View>
+  );
+}
+
+const planBStyles = StyleSheet.create({
+  card: {
+    backgroundColor: '#A855F714',
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: '#A855F740',
+    gap: Spacing.sm,
+  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  title: {
+    fontSize: Typography.fontSizeSM,
+    fontWeight: Typography.fontWeightSemiBold,
+    color: '#A855F7',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  text: {
+    fontSize: Typography.fontSizeMD,
+    color: Colors.textSecondary,
+    lineHeight: Typography.fontSizeMD * 1.6,
+    fontStyle: 'italic',
+  },
+});
+
 // ─── 9. Question finale ───────────────────────────────────────────────────────
 
 function DecidingQuestion({ question }: { question: string }) {
@@ -582,6 +623,11 @@ export default function ResultScreen() {
       {/* 8. Angle mort */}
       {analysis?.blindspot ? (
         <BlindspotCard text={analysis.blindspot} />
+      ) : null}
+
+      {/* Plan B */}
+      {analysis?.alternative_strategy ? (
+        <PlanBCard text={analysis.alternative_strategy} />
       ) : null}
 
       {/* 9. Question finale */}

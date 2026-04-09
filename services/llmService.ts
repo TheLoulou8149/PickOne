@@ -161,9 +161,18 @@ Exemples :
 - "CDI vs startup" → [{"id":"opt1","label":"CDI stable"}, {"id":"opt2","label":"Startup risquée"}]
 - "Lyon, Nantes ou Bordeaux" → [{"id":"opt1","label":"Lyon"}, {"id":"opt2","label":"Nantes"}, {"id":"opt3","label":"Bordeaux"}]
 
-RÈGLE N°0 — FILTRE AVANT DE POSER UNE QUESTION :
+ÉTAPE 1 — GÉNÈRE MENTALEMENT TOUTES LES QUESTIONS CANDIDATES :
+Liste toutes les questions qui pourraient éclairer ce choix. Ne te censure pas encore.
+
+ÉTAPE 2 — FILTRE DE PERTINENCE (applique dans cet ordre) :
+Pour chaque question candidate, élimine-la si :
+→ La réponse est déjà dans le texte fourni (RÈGLE N°0)
+→ C'est une question générique interdite (RÈGLE N°1)
+→ Sa réponse ne changerait pas réellement l'analyse du choix
+
+RÈGLE N°0 — FILTRE CONTENU :
 Avant de formuler chaque question, demande-toi : "Est-ce que la réponse est déjà dans le texte ?"
-Si oui → ne pose PAS cette question, remplace-la par quelque chose que le texte ne dit pas.
+Si oui → ne pose PAS cette question.
 
 RÈGLE N°1 — QUESTIONS INTERDITES (trop génériques) :
 'Qu'est-ce qui compte le plus pour toi ?'
@@ -172,16 +181,24 @@ RÈGLE N°1 — QUESTIONS INTERDITES (trop génériques) :
 'Quelles sont tes contraintes ?'
 'Qu'est-ce qui t'attire dans chaque option ?'
 
+ÉTAPE 3 — SÉLECTION DU NOMBRE OPTIMAL (entre 2 et 10) :
+Garde uniquement les questions indispensables — celles dont la réponse change réellement l'analyse.
+Le nombre final dépend exclusivement de la pertinence :
+- Contexte simple et univoque → 2 à 3 questions
+- Contexte standard → 4 à 6 questions
+- Contexte complexe, multi-enjeux ou chargé émotionnellement → 7 à 10 questions
+Critère absolu : chaque question conservée doit être indispensable. Filtre sans pitié.
+
 RÈGLE N°2 — QUESTION INSTINCT OBLIGATOIRE :
-L'une des 5 questions DOIT être de type 'choice' avec comme options : les labels de chaque option extraite + 'Les options se valent'. Cette question sert à détecter l'instinct.
+L'une des questions DOIT être de type 'choice' avec comme options : les labels de chaque option extraite + 'Les options se valent'. Cette question sert à détecter l'instinct.
 Ex : 'Quand tu imagines ta journée dans 6 mois, laquelle des options te vient naturellement en premier ?'
 
-RÈGLE N°3 — PROGRESSION ÉMOTIONNELLE :
-Q1 : factuelle — un fait ou chiffre clé de la situation
-Q2 : factuelle — une contrainte ou enjeu concret
-Q3 : émotionnelle — ressenti, peur ou désir autour du choix
-Q4 : OBLIGATOIRE — question instinct (voir règle N°2)
-Q5 : inconfortable — la question que la personne préfère ne pas se poser
+RÈGLE N°3 — ORDRE DE LA SÉRIE :
+- 1ère position : question factuelle (fait ou chiffre clé absent du texte)
+- Milieu : questions factuelles et émotionnelles selon le contexte
+- Avant-dernière position : question instinct (type 'choice', voir règle N°2)
+- Dernière position : question inconfortable (celle que la personne préfère éviter)
+Exception si N=2 : Q1=instinct, Q2=inconfortable.
 
 N'utilise PAS de guillemets autour des mots dans les questions.
 
@@ -194,13 +211,13 @@ FORMAT — JSON pur, sans markdown, sans backticks :
     {"id": "opt1", "label": "3 mots max"},
     {"id": "opt2", "label": "3 mots max"}
   ],
-  "instinct_question_id": "q4",
+  "instinct_question_id": "q[N-1]",
   "questions": [
-    { "id": "q1", "question": "...", "type": "choice", "options": ["...", "...", "..."] },
+    { "id": "q1", "question": "...", "type": "choice", "options": ["...", "..."] },
     { "id": "q2", "question": "...", "type": "slider", "min_label": "...", "max_label": "..." },
-    { "id": "q3", "question": "...", "type": "open" },
-    { "id": "q4", "question": "...", "type": "choice", "options": ["[opt1.label]", "[opt2.label]", "Les options se valent"] },
-    { "id": "q5", "question": "...", "type": "open" }
+    ...entre 2 et 10 questions selon pertinence...
+    { "id": "q[N-1]", "question": "Quand tu imagines...", "type": "choice", "options": ["[opt1.label]", "[opt2.label]", "Les options se valent"] },
+    { "id": "q[N]", "question": "...", "type": "open" }
   ]
 }`;
 
@@ -219,7 +236,7 @@ export async function callAppel1(originalText: string): Promise<{ data: Appel1Re
 ${originalText}
 ---
 ${ctxBlock}
-Génère 5 questions pertinentes et progressives sur cette situation.`;
+Analyse la richesse du contexte et génère entre 2 et 10 questions pertinentes sur cette situation. Choisis le nombre optimal selon la pertinence — ni plus, ni moins.`;
 
   const { text, provider } = await callLLM(SYSTEM_APPEL_1, userMessage);
   return { data: parseResponse<Appel1Response>(text), provider };
@@ -304,6 +321,7 @@ RÈGLES :
 6. recommendation : reprend exactement le label de l'option recommandée
 7. recommendation_reason : 2-3 phrases, cite des éléments précis. Ne répète pas les scores — l'app les affiche déjà.
 8. N'utilise JAMAIS de guillemets autour des mots ou expressions de l'utilisateur. Intègre-les directement dans tes phrases sans les encadrer.
+9. alternative_strategy (OPTIONNEL) : Si le score pondéré maximum parmi toutes les options est inférieur à 40/100, OU si les deux scores de regret dépasseraient 65%, génère ce champ. C'est une 3ème voie créative et concrète que la personne n'a pas envisagée, ancrée dans sa situation spécifique. 2-3 phrases directes. Commence par "Et si..." ou "Une piste non explorée :". Si les options semblent satisfaisantes, n'inclus PAS ce champ dans le JSON.
 
 CONTRAINTES POUR LES % DE REGRET :
 - regret_score_chosen : risque de regret si on choisit l'option recommandée
@@ -325,7 +343,8 @@ FORMAT — JSON pur sans markdown :
   "regret_score_other": 68,
   "regret_other_reason": "Dans 1 an, si [scénario précis]...",
   "blindspot": "Ce qu'elle évite de voir. Direct. 2 phrases.",
-  "deciding_question": "La question radicale qui tranche tout."
+  "deciding_question": "La question radicale qui tranche tout.",
+  "alternative_strategy": "optionnel — seulement si options insatisfaisantes (score max < 40 ou regret > 65%). Une 3ème voie concrète ancrée dans la situation. 2-3 phrases."
 }`;
 
 export interface Appel3Response extends Analysis {}
