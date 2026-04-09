@@ -1,18 +1,53 @@
-import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
-import { Platform } from 'react-native';
+import { Platform, View, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/theme';
+import { supabase } from '@/lib/supabase';
+import type { Session } from '@supabase/supabase-js';
 
 SplashScreen.preventAutoHideAsync();
 
 const isWeb = Platform.OS === 'web';
 
 export default function RootLayout() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [initialized, setInitialized] = useState(false);
+  const router = useRouter();
+  const segments = useSegments();
+
   useEffect(() => {
-    SplashScreen.hideAsync();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setInitialized(true);
+      SplashScreen.hideAsync();
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!initialized) return;
+    const inAuthGroup = segments[0] === 'auth';
+    if (!session && !inAuthGroup) {
+      router.replace('/auth' as any);
+    } else if (session && inAuthGroup) {
+      router.replace('/' as any);
+    }
+  }, [session, initialized, segments]);
+
+  if (!initialized) {
+    return (
+      <View style={{ flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator color={Colors.primary} size="large" />
+      </View>
+    );
+  }
 
   return (
     <>
@@ -26,10 +61,12 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="dilemma/index" />
-<Stack.Screen
+        <Stack.Screen
           name="result/index"
           options={{ animation: isWeb ? 'none' : 'fade' }}
         />
+        <Stack.Screen name="auth/index" />
+        <Stack.Screen name="history/index" />
       </Stack>
     </>
   );

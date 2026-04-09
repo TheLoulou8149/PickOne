@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase';
 import {
   RotateCcw,
   AlertTriangle,
@@ -472,6 +473,34 @@ export default function ResultScreen() {
   const router = useRouter();
   const store = useDecisionStore();
   const analysis = store.analysis;
+  const hasSaved = useRef(false);
+
+  useEffect(() => {
+    if (!analysis || hasSaved.current) return;
+    hasSaved.current = true;
+
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) {
+        console.warn('[PickOne] Pas d\'utilisateur connecté, sauvegarde ignorée');
+        return;
+      }
+      const { error } = await supabase.from('decisions').insert({
+        user_id: user.id,
+        dilemma: store.originalText,
+        option_a: store.optionALabel,
+        option_b: store.optionBLabel,
+        winner: store.winner,
+        score_a: store.scoreA,
+        score_b: store.scoreB,
+        niveau_reco: store.niveauReco,
+        analysis: store.analysis,
+        criteria: store.criteria,
+        answers: store.answers,
+      });
+      if (error) console.error('[PickOne] Erreur sauvegarde décision:', error.message, error.code);
+      else console.log('[PickOne] Décision sauvegardée ✓');
+    });
+  }, [analysis]);
 
   const winnerIsA = store.scoreA >= store.scoreB;
   const chosenLabel = winnerIsA ? store.optionALabel : store.optionBLabel;
