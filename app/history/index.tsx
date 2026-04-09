@@ -9,6 +9,7 @@ import {
   Alert,
   Modal,
   Pressable,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
@@ -51,6 +52,17 @@ const NIVEAU_COLOR: Record<string, string> = {
   léger: '#3B82F6',
   clair: '#10B981',
 };
+
+function confirmAlert(title: string, message: string, onConfirm: () => void) {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n${message}`)) onConfirm();
+  } else {
+    Alert.alert(title, message, [
+      { text: 'Annuler', style: 'cancel' },
+      { text: 'Supprimer', style: 'destructive', onPress: onConfirm },
+    ]);
+  }
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -175,7 +187,7 @@ function DecisionCard({
                 <>
                   <Text style={styles.winnerScore}>{winnerScore}/100</Text>
                   <Text style={styles.vs}>·</Text>
-                  <Text style={styles.loserScore}>{loserLabel} {loserScore}/100</Text>
+                  <Text style={styles.loserScore} numberOfLines={1}>{loserLabel} {loserScore}/100</Text>
                 </>
               ) : null}
               {item.niveau_reco ? (
@@ -251,41 +263,29 @@ export default function HistoryScreen() {
     setSelected(new Set(decisions.map((d) => d.id)));
   }
 
-  async function deleteSelected() {
+  function deleteSelected() {
     const ids = [...selected];
-    Alert.alert(
+    confirmAlert(
       'Supprimer',
       `Supprimer ${ids.length} décision${ids.length > 1 ? 's' : ''} ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer', style: 'destructive',
-          onPress: async () => {
-            await supabase.from('decisions').delete().in('id', ids);
-            setDecisions((prev) => prev.filter((d) => !selected.has(d.id)));
-            cancelSelecting();
-          },
-        },
-      ]
+      async () => {
+        await supabase.from('decisions').delete().in('id', ids);
+        setDecisions((prev) => prev.filter((d) => !selected.has(d.id)));
+        cancelSelecting();
+      }
     );
   }
 
-  async function deleteAll() {
-    Alert.alert(
+  function deleteAll() {
+    confirmAlert(
       'Tout supprimer',
-      'Supprimer tout l\'historique ? Cette action est irréversible.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Tout supprimer', style: 'destructive',
-          onPress: async () => {
-            const ids = decisions.map((d) => d.id);
-            await supabase.from('decisions').delete().in('id', ids);
-            setDecisions([]);
-            cancelSelecting();
-          },
-        },
-      ]
+      "Supprimer tout l'historique ? Cette action est irréversible.",
+      async () => {
+        const ids = decisions.map((d) => d.id);
+        await supabase.from('decisions').delete().in('id', ids);
+        setDecisions([]);
+        cancelSelecting();
+      }
     );
   }
 
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   resultRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flex: 1 },
   winnerScore: { fontSize: Typography.fontSizeXS, fontWeight: Typography.fontWeightBold, color: Colors.primary },
-  loserScore: { fontSize: Typography.fontSizeXS, color: Colors.textMuted },
+  loserScore: { fontSize: Typography.fontSizeXS, color: Colors.textMuted, flexShrink: 1 },
   niveauBadge: { borderRadius: BorderRadius.full, paddingHorizontal: Spacing.sm, paddingVertical: 2, borderWidth: 1 },
   niveauText: { fontSize: Typography.fontSizeXS, fontWeight: Typography.fontWeightSemiBold },
   footerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },

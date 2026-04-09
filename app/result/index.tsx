@@ -544,8 +544,23 @@ export default function ResultScreen() {
         criteria: store.criteria,
         answers: store.answers,
       });
-      if (error) console.error('[PickOne] Erreur sauvegarde décision:', error.message, error.code);
-      else console.log('[PickOne] Décision sauvegardée ✓');
+      if (error) {
+        console.error('[PickOne] Erreur sauvegarde décision:', error.message, error.code);
+      } else {
+        console.log('[PickOne] Décision sauvegardée ✓');
+        // Incrémenter le compteur all-time dans user_stats
+        const { data: stats } = await supabase
+          .from('user_stats')
+          .select('total_decisions')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        const { error: statsErr } = await supabase.from('user_stats').upsert(
+          { user_id: user.id, total_decisions: (stats?.total_decisions ?? 0) + 1 },
+          { onConflict: 'user_id' }
+        );
+        if (statsErr) console.error('[PickOne] Erreur stats:', statsErr.message);
+        else console.log('[PickOne] total_decisions:', (stats?.total_decisions ?? 0) + 1);
+      }
     });
   }, [analysis]);
 

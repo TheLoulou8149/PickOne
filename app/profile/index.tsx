@@ -42,9 +42,12 @@ function TabCompte() {
         })
       );
       setLoading(false);
-    });
-    supabase.from('decisions').select('id', { count: 'exact', head: true }).then(({ count }) => {
-      setDecisionCount(count ?? 0);
+      // Lire le compteur all-time depuis user_stats
+      supabase.from('user_stats')
+        .select('total_decisions')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => setDecisionCount(data?.total_decisions ?? 0));
     });
   }, []);
 

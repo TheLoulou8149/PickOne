@@ -5,10 +5,10 @@ import { supabase } from '@/lib/supabase';
 
 const IS_WEB = Platform.OS === 'web';
 
-const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY ?? '';
+
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
-const TIMEOUT = 30000;
+const TIMEOUT = 50000;
 
 // ─── JSON parsing robuste (depuis la spec PDF) ────────────────────────────────
 
@@ -51,34 +51,6 @@ function parseResponse<T>(raw: string): T {
 
 // ─── Appels API par provider ──────────────────────────────────────────────────
 
-async function callAnthropic(systemPrompt: string, userMessage: string): Promise<string> {
-  if (IS_WEB) {
-    const response = await axios.post(
-      '/api/llm',
-      { target: 'anthropic', systemPrompt, userMessage },
-      { timeout: TIMEOUT }
-    );
-    return response.data.text;
-  }
-  const response = await axios.post(
-    'https://api.anthropic.com/v1/messages',
-    {
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 2000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    },
-    {
-      timeout: TIMEOUT,
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-    }
-  );
-  return response.data.content[0].text;
-}
 
 async function callGemini(systemPrompt: string, userMessage: string): Promise<string> {
   if (IS_WEB) {
@@ -108,12 +80,22 @@ async function callLLM(
   userMessage: string,
   attempt = 0
 ): Promise<{ text: string; provider: 'gemini' | 'anthropic' }> {
+  // Sur web : un seul appel, le fallback Gemini→Anthropic est géré côté serveur
+  if (IS_WEB) {
+    const response = await axios.post(
+      '/api/llm',
+      { systemPrompt, userMessage },
+      { timeout: TIMEOUT }
+    );
+    return { text: response.data.text, provider: response.data.provider };
+  }
+
+  // Sur natif : Gemini uniquement
   try {
     const text = await callGemini(systemPrompt, userMessage);
     return { text, provider: 'gemini' };
   } catch (err: any) {
     const status = err?.response?.status;
-    // Retry Gemini sur rate limit
     if (status === 429 && attempt < 2) {
       const raw: string = err?.response?.data?.error?.message ?? '';
       const match = raw.match(/retry in ([\d.]+)s/);
@@ -121,9 +103,7 @@ async function callLLM(
       await new Promise((res) => setTimeout(res, delay));
       return callLLM(systemPrompt, userMessage, attempt + 1);
     }
-    // Fallback Anthropic sur toute autre erreur
-    const text = await callAnthropic(systemPrompt, userMessage);
-    return { text, provider: 'anthropic' };
+    throw err;
   }
 }
 
@@ -136,7 +116,7 @@ export async function getUserContextBlock(): Promise<string> {
     .from('user_context')
     .select('age, situation_pro, situation_perso, valeurs, style_risque, contexte_libre')
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
   if (!data) return '';
 
   const lines: string[] = [];
