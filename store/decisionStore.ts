@@ -2,6 +2,11 @@ import { create } from 'zustand';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface Option {
+  id: string;    // 'opt1', 'opt2', ... 'opt5'
+  label: string; // label court extrait par l'IA
+}
+
 export interface Question {
   id: string;
   question: string;
@@ -16,9 +21,8 @@ export interface Criterion {
   id: string;
   label: string;
   description: string;
-  default_weight: number;  // 1-10
-  score_a: number;         // 1-10
-  score_b: number;         // 1-10
+  default_weight: number;           // 1-10
+  option_scores: Record<string, number>; // optionId → score 1-10
   score_rationale: string;
 }
 
@@ -37,8 +41,7 @@ export interface Analysis {
 export interface DecisionState {
   // ─── Appel 1 ──────────────────────────────────────────────────────────────
   originalText: string;
-  optionALabel: string;
-  optionBLabel: string;
+  options: Option[];           // 2-5 options (remplace optionALabel/optionBLabel)
   contextSummary: string;
   questions: Question[];
   instinctQuestionId: string;
@@ -48,17 +51,15 @@ export interface DecisionState {
   criteria: Criterion[];
 
   // User-adjusted (initialized from Appel 2 defaults)
-  weights: Record<string, number>;    // criterionId → weight 1-10
-  userScoresA: Record<string, number>;
-  userScoresB: Record<string, number>;
+  weights: Record<string, number>;                          // criterionId → weight 1-10
+  userScores: Record<string, Record<string, number>>;       // optionId → criterionId → score
 
   // ─── Computed locally ─────────────────────────────────────────────────────
-  scoreA: number;          // 0-100
-  scoreB: number;          // 0-100
+  scores: Record<string, number>;   // optionId → 0-100
   niveauReco: 'serré' | 'léger' | 'clair';
   labelNiveau: string;
   messageCoherence: string;
-  winner: string;          // = optionALabel or optionBLabel
+  winner: string;                   // label de l'option gagnante
 
   // ─── Appel 3 ──────────────────────────────────────────────────────────────
   analysis: Analysis | null;
@@ -73,8 +74,7 @@ export interface DecisionState {
   // ─── Actions ──────────────────────────────────────────────────────────────
   setAppel1Result: (data: {
     originalText: string;
-    optionALabel: string;
-    optionBLabel: string;
+    options: Option[];
     contextSummary: string;
     questions: Question[];
     instinctQuestionId: string;
@@ -82,8 +82,7 @@ export interface DecisionState {
   setAnswer: (questionId: string, value: string) => void;
   setAppel2Result: (criteria: Criterion[]) => void;
   setWeight: (criterionId: string, weight: number) => void;
-  setUserScoreA: (criterionId: string, score: number) => void;
-  setUserScoreB: (criterionId: string, score: number) => void;
+  setUserScore: (optionId: string, criterionId: string, score: number) => void;
   computeScores: () => void;
   setAnalysis: (analysis: Analysis) => void;
   setAiProvider: (appel: 'appel1' | 'appel2' | 'appel3', provider: string) => void;
@@ -106,7 +105,7 @@ function computeWeightedScore(
     const note = scores[c.id] ?? 5;
     return sum + note * poids;
   }, 0);
-  // Formula from spec: Σ(note × poids) / totalPoids × 10 → résultat sur 100
+  // Formula: Σ(note × poids) / totalPoids × 10 → résultat sur 100
   return Math.round((weightedSum / totalPoids) * 10);
 }
 
@@ -115,7 +114,7 @@ function getNiveauReco(
   winnerLabel: string
 ): { niveau: 'serré' | 'léger' | 'clair'; label: string } {
   if (ecart < 5) {
-    return { niveau: 'serré', label: 'Décision serrée — les deux options se valent' };
+    return { niveau: 'serré', label: 'Décision serrée — les options se valent' };
   } else if (ecart < 15) {
     return { niveau: 'léger', label: `Légère préférence pour ${winnerLabel}` };
   } else {
@@ -123,11 +122,8 @@ function getNiveauReco(
   }
 }
 
-function getCoherenceMessage(
-  instinct: string,
-  winner: string
-): string {
-  if (!instinct || instinct === 'Les deux pareil') {
+function getCoherenceMessage(instinct: string, winner: string): string {
+  if (!instinct || instinct === 'Les deux pareil' || instinct === 'Les options se valent') {
     return "Ton instinct n'a pas de préférence claire — les scores servent de boussole.";
   }
   if (instinct === winner) {
@@ -140,22 +136,19 @@ function getCoherenceMessage(
 
 const INIT: Omit<DecisionState,
   | 'setAppel1Result' | 'setAnswer' | 'setAppel2Result' | 'setWeight'
-  | 'setUserScoreA' | 'setUserScoreB' | 'computeScores' | 'setAnalysis'
+  | 'setUserScore' | 'computeScores' | 'setAnalysis'
   | 'setAiProvider' | 'setLoading' | 'setPhase' | 'reset'
 > = {
   originalText: '',
-  optionALabel: '',
-  optionBLabel: '',
+  options: [],
   contextSummary: '',
   questions: [],
   instinctQuestionId: '',
   answers: {},
   criteria: [],
   weights: {},
-  userScoresA: {},
-  userScoresB: {},
-  scoreA: 0,
-  scoreB: 0,
+  userScores: {},
+  scores: {},
   niveauReco: 'serré',
   labelNiveau: '',
   messageCoherence: '',
@@ -171,42 +164,52 @@ const INIT: Omit<DecisionState,
 export const useDecisionStore = create<DecisionState>((set, get) => ({
   ...INIT,
 
-  setAppel1Result: ({ originalText, optionALabel, optionBLabel, contextSummary, questions, instinctQuestionId }) =>
-    set({ originalText, optionALabel, optionBLabel, contextSummary, questions, instinctQuestionId, answers: {} }),
+  setAppel1Result: ({ originalText, options, contextSummary, questions, instinctQuestionId }) =>
+    set({ originalText, options, contextSummary, questions, instinctQuestionId, answers: {} }),
 
   setAnswer: (questionId, value) =>
     set((s) => ({ answers: { ...s.answers, [questionId]: value } })),
 
   setAppel2Result: (criteria) => {
     const weights: Record<string, number> = {};
-    const userScoresA: Record<string, number> = {};
-    const userScoresB: Record<string, number> = {};
+    const userScores: Record<string, Record<string, number>> = {};
     for (const c of criteria) {
       weights[c.id] = c.default_weight;
-      userScoresA[c.id] = c.score_a;
-      userScoresB[c.id] = c.score_b;
+      for (const [optId, score] of Object.entries(c.option_scores)) {
+        if (!userScores[optId]) userScores[optId] = {};
+        userScores[optId][c.id] = score;
+      }
     }
-    set({ criteria, weights, userScoresA, userScoresB });
+    set({ criteria, weights, userScores });
   },
 
   setWeight: (criterionId, weight) =>
     set((s) => ({ weights: { ...s.weights, [criterionId]: weight } })),
 
-  setUserScoreA: (criterionId, score) =>
-    set((s) => ({ userScoresA: { ...s.userScoresA, [criterionId]: score } })),
-
-  setUserScoreB: (criterionId, score) =>
-    set((s) => ({ userScoresB: { ...s.userScoresB, [criterionId]: score } })),
+  setUserScore: (optionId, criterionId, score) =>
+    set((s) => ({
+      userScores: {
+        ...s.userScores,
+        [optionId]: { ...(s.userScores[optionId] ?? {}), [criterionId]: score },
+      },
+    })),
 
   computeScores: () => {
     const s = get();
-    const scoreA = computeWeightedScore(s.criteria, s.weights, s.userScoresA);
-    const scoreB = computeWeightedScore(s.criteria, s.weights, s.userScoresB);
-    const winner = scoreA >= scoreB ? s.optionALabel : s.optionBLabel;
-    const { niveau, label } = getNiveauReco(Math.abs(scoreA - scoreB), winner);
+    const scores: Record<string, number> = {};
+    for (const opt of s.options) {
+      scores[opt.id] = computeWeightedScore(s.criteria, s.weights, s.userScores[opt.id] ?? {});
+    }
+    // Trier pour trouver le gagnant et le niveau
+    const sorted = [...s.options].sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
+    const winner = sorted[0]?.label ?? '';
+    const ecart = sorted.length >= 2
+      ? (scores[sorted[0].id] ?? 0) - (scores[sorted[1].id] ?? 0)
+      : 100;
+    const { niveau, label } = getNiveauReco(ecart, winner);
     const instinct = s.answers[s.instinctQuestionId] ?? '';
     const messageCoherence = getCoherenceMessage(instinct, winner);
-    set({ scoreA, scoreB, winner, niveauReco: niveau, labelNiveau: label, messageCoherence });
+    set({ scores, winner, niveauReco: niveau, labelNiveau: label, messageCoherence });
   },
 
   setAnalysis: (analysis) => set({ analysis }),

@@ -98,8 +98,7 @@ export default function HomeScreen() {
       const { data: result, provider } = await callAppel1(text.trim());
       setAppel1Result({
         originalText: text.trim(),
-        optionALabel: result.option_a_label,
-        optionBLabel: result.option_b_label,
+        options: result.options,
         contextSummary: result.context_summary,
         questions: result.questions,
         instinctQuestionId: result.instinct_question_id,

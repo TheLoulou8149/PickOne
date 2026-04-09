@@ -106,58 +106,46 @@ const niveauStyles = StyleSheet.create({
   reason: { fontSize: Typography.fontSizeSM, color: Colors.textSecondary, lineHeight: Typography.fontSizeSM * 1.6 },
 });
 
-// ─── 2. Scores A vs B ─────────────────────────────────────────────────────────
+// ─── 2. Scores (multi-options) ────────────────────────────────────────────────
 
 function ScoresCard({
-  scoreA,
-  scoreB,
-  optionALabel,
-  optionBLabel,
+  options,
+  scores,
+  winner,
 }: {
-  scoreA: number;
-  scoreB: number;
-  optionALabel: string;
-  optionBLabel: string;
+  options: { id: string; label: string }[];
+  scores: Record<string, number>;
+  winner: string;
 }) {
-  const winnerA = scoreA > scoreB;
-  const winnerB = scoreB > scoreA;
-
-  const colorA = winnerA ? Colors.primary : Colors.textMuted;
-  const colorB = winnerB ? Colors.primary : Colors.textMuted;
+  // Trier par score décroissant
+  const sorted = [...options].sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
 
   return (
     <Section>
       <SectionTitle>Scores pondérés</SectionTitle>
-
-      {/* Jauge A */}
-      <View style={scoresStyles.gaugeBlock}>
-        <View style={scoresStyles.gaugeHeader}>
-          <Text style={[scoresStyles.gaugeName, { color: colorA }]}>{optionALabel}</Text>
-          <View style={scoresStyles.gaugeScoreWrap}>
-            <Text style={[scoresStyles.gaugeScore, { color: colorA }]}>{scoreA}</Text>
-            <Text style={scoresStyles.gaugeMax}>/100</Text>
+      {sorted.map((opt, rank) => {
+        const score = scores[opt.id] ?? 0;
+        const isWinner = opt.label === winner;
+        const color = isWinner ? Colors.primary : Colors.textMuted;
+        return (
+          <View key={opt.id} style={scoresStyles.gaugeBlock}>
+            <View style={scoresStyles.gaugeHeader}>
+              <View style={scoresStyles.nameRow}>
+                {rank === 0 && <Text style={scoresStyles.rankBadge}>#1</Text>}
+                <Text style={[scoresStyles.gaugeName, { color }]}>{opt.label}</Text>
+              </View>
+              <View style={scoresStyles.gaugeScoreWrap}>
+                <Text style={[scoresStyles.gaugeScore, { color }]}>{score}</Text>
+                <Text style={scoresStyles.gaugeMax}>/100</Text>
+              </View>
+            </View>
+            <View style={scoresStyles.track}>
+              <View style={[scoresStyles.fill, { width: `${score}%`, backgroundColor: color }]} />
+            </View>
+            {isWinner && <Text style={scoresStyles.winnerTag}>Meilleur score</Text>}
           </View>
-        </View>
-        <View style={scoresStyles.track}>
-          <View style={[scoresStyles.fill, { width: `${scoreA}%`, backgroundColor: colorA }]} />
-        </View>
-        {winnerA && <Text style={scoresStyles.winnerTag}>Meilleur score</Text>}
-      </View>
-
-      {/* Jauge B */}
-      <View style={scoresStyles.gaugeBlock}>
-        <View style={scoresStyles.gaugeHeader}>
-          <Text style={[scoresStyles.gaugeName, { color: colorB }]}>{optionBLabel}</Text>
-          <View style={scoresStyles.gaugeScoreWrap}>
-            <Text style={[scoresStyles.gaugeScore, { color: colorB }]}>{scoreB}</Text>
-            <Text style={scoresStyles.gaugeMax}>/100</Text>
-          </View>
-        </View>
-        <View style={scoresStyles.track}>
-          <View style={[scoresStyles.fill, { width: `${scoreB}%`, backgroundColor: colorB }]} />
-        </View>
-        {winnerB && <Text style={scoresStyles.winnerTag}>Meilleur score</Text>}
-      </View>
+        );
+      })}
     </Section>
   );
 }
@@ -169,13 +157,27 @@ const scoresStyles = StyleSheet.create({
   gaugeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
+    alignItems: 'center',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  rankBadge: {
+    fontSize: Typography.fontSizeXS,
+    fontWeight: Typography.fontWeightBold,
+    color: Colors.primary,
+    backgroundColor: Colors.primary + '20',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
   gaugeName: {
     fontSize: Typography.fontSizeMD,
     fontWeight: Typography.fontWeightBold,
-    flex: 1,
-    flexWrap: 'wrap',
   },
   gaugeScoreWrap: {
     flexDirection: 'row',
@@ -487,11 +489,11 @@ export default function ResultScreen() {
       const { error } = await supabase.from('decisions').insert({
         user_id: user.id,
         dilemma: store.originalText,
-        option_a: store.optionALabel,
-        option_b: store.optionBLabel,
+        option_a: store.options[0]?.label ?? '',
+        option_b: store.options[1]?.label ?? '',
         winner: store.winner,
-        score_a: store.scoreA,
-        score_b: store.scoreB,
+        score_a: store.scores[store.options[0]?.id ?? ''] ?? 0,
+        score_b: store.scores[store.options[1]?.id ?? ''] ?? 0,
         niveau_reco: store.niveauReco,
         label_niveau: store.labelNiveau,
         message_coherence: store.messageCoherence,
@@ -506,9 +508,12 @@ export default function ResultScreen() {
     });
   }, [analysis]);
 
-  const winnerIsA = store.scoreA >= store.scoreB;
-  const chosenLabel = winnerIsA ? store.optionALabel : store.optionBLabel;
-  const otherLabel = winnerIsA ? store.optionBLabel : store.optionALabel;
+  // Options triées par score décroissant
+  const sortedOptions = [...store.options].sort(
+    (a, b) => (store.scores[b.id] ?? 0) - (store.scores[a.id] ?? 0)
+  );
+  const chosenLabel = sortedOptions[0]?.label ?? store.winner;
+  const otherLabel = sortedOptions[1]?.label ?? '';
 
   return (
     <ScrollView
@@ -527,10 +532,9 @@ export default function ResultScreen() {
 
       {/* 2. Scores */}
       <ScoresCard
-        scoreA={store.scoreA}
-        scoreB={store.scoreB}
-        optionALabel={store.optionALabel}
-        optionBLabel={store.optionBLabel}
+        options={store.options}
+        scores={store.scores}
+        winner={store.winner}
       />
 
       {/* 3. Cohérence instinct / logique */}

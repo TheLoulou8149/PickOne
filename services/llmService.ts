@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
-import type { Question, Criterion, Analysis } from '@/store/decisionStore';
+import type { Option, Question, Criterion, Analysis } from '@/store/decisionStore';
 import { supabase } from '@/lib/supabase';
 
 const IS_WEB = Platform.OS === 'web';
@@ -155,11 +155,15 @@ export async function getUserContextBlock(): Promise<string> {
 
 const SYSTEM_APPEL_1 = `Tu es un coach de décision expert. Tu analyses une situation décisionnelle et génères des questions de clarification.
 
+EXTRACTION DES OPTIONS :
+Identifie toutes les options présentes dans le texte (2 minimum, 5 maximum). Chaque option reçoit un id séquentiel (opt1, opt2, opt3…) et un label court (3 mots max).
+Exemples :
+- "CDI vs startup" → [{"id":"opt1","label":"CDI stable"}, {"id":"opt2","label":"Startup risquée"}]
+- "Lyon, Nantes ou Bordeaux" → [{"id":"opt1","label":"Lyon"}, {"id":"opt2","label":"Nantes"}, {"id":"opt3","label":"Bordeaux"}]
+
 RÈGLE N°0 — FILTRE AVANT DE POSER UNE QUESTION :
 Avant de formuler chaque question, demande-toi : "Est-ce que la réponse est déjà dans le texte ?"
 Si oui → ne pose PAS cette question, remplace-la par quelque chose que le texte ne dit pas.
-Exemple : si le texte mentionne déjà le salaire, ne demande pas le salaire. Si le texte dit "ma copine préfère que je reste", ne demande pas l'avis du conjoint.
-Seules les informations MANQUANTES méritent d'être demandées.
 
 RÈGLE N°1 — QUESTIONS INTERDITES (trop génériques) :
 'Qu'est-ce qui compte le plus pour toi ?'
@@ -168,9 +172,9 @@ RÈGLE N°1 — QUESTIONS INTERDITES (trop génériques) :
 'Quelles sont tes contraintes ?'
 'Qu'est-ce qui t'attire dans chaque option ?'
 
-RÈGLE N°2 — QUESTION OBLIGATOIRE :
-L'une des 5 questions DOIT être de type 'choice' avec exactement ces 3 options : [label_option_A], [label_option_B], 'Les deux pareil'. Cette question sert à détecter l'instinct.
-Ex : 'Quand tu imagines ta journée dans 6 mois, lequel des deux te vient naturellement en premier ?'
+RÈGLE N°2 — QUESTION INSTINCT OBLIGATOIRE :
+L'une des 5 questions DOIT être de type 'choice' avec comme options : les labels de chaque option extraite + 'Les options se valent'. Cette question sert à détecter l'instinct.
+Ex : 'Quand tu imagines ta journée dans 6 mois, laquelle des options te vient naturellement en premier ?'
 
 RÈGLE N°3 — PROGRESSION ÉMOTIONNELLE :
 Q1 : factuelle — un fait ou chiffre clé de la situation
@@ -181,27 +185,28 @@ Q5 : inconfortable — la question que la personne préfère ne pas se poser
 
 N'utilise PAS de guillemets autour des mots dans les questions.
 
-TYPES : 'choice' (2-4 options, max 6 mots chacune), 'slider' (extrêmes 3 mots max), 'open' (texte libre)
+TYPES : 'choice' (2-6 options, max 6 mots chacune), 'slider' (extrêmes 3 mots max), 'open' (texte libre)
 
 FORMAT — JSON pur, sans markdown, sans backticks :
 {
   "context_summary": "1-2 phrases résumant la situation",
-  "option_a_label": "3 mots max",
-  "option_b_label": "3 mots max",
+  "options": [
+    {"id": "opt1", "label": "3 mots max"},
+    {"id": "opt2", "label": "3 mots max"}
+  ],
   "instinct_question_id": "q4",
   "questions": [
     { "id": "q1", "question": "...", "type": "choice", "options": ["...", "...", "..."] },
     { "id": "q2", "question": "...", "type": "slider", "min_label": "...", "max_label": "..." },
     { "id": "q3", "question": "...", "type": "open" },
-    { "id": "q4", "question": "...", "type": "choice", "options": ["[optA]", "[optB]", "Les deux pareil"] },
+    { "id": "q4", "question": "...", "type": "choice", "options": ["[opt1.label]", "[opt2.label]", "Les options se valent"] },
     { "id": "q5", "question": "...", "type": "open" }
   ]
 }`;
 
 export interface Appel1Response {
   context_summary: string;
-  option_a_label: string;
-  option_b_label: string;
+  options: Option[];
   instinct_question_id: string;
   questions: Question[];
 }
@@ -234,7 +239,7 @@ Si texte cite 'copine ne peut pas partir' → 'Couple vs projet'
 Si texte cite '3k€ de MRR' → 'MRR validé vs CDI stable'
 Si texte cite 'crédit 900€' → 'Charges fixes 900€/mois'
 
-SCORES : A et B doivent être vraiment différenciés. Interdit : 5 vs 5, 6 vs 6, 7 vs 7. Justifie chaque score par les infos données.
+SCORES : Chaque option doit avoir un score différencié (1-10). Interdit d'attribuer le même score à toutes les options sur un critère. Justifie chaque score par les infos données.
 
 FORMAT — JSON pur sans markdown :
 {
@@ -244,8 +249,10 @@ FORMAT — JSON pur sans markdown :
       "label": "label depuis texte (4 mots max)",
       "description": "pourquoi crucial ici (1 ligne)",
       "default_weight": 7,
-      "score_a": 4,
-      "score_b": 8,
+      "option_scores": {
+        "opt1": 4,
+        "opt2": 8
+      },
       "score_rationale": "justification des scores (1 ligne)"
     }
   ]
@@ -257,8 +264,7 @@ export interface Appel2Response {
 
 export async function callAppel2(ctx: {
   originalText: string;
-  optionALabel: string;
-  optionBLabel: string;
+  options: Option[];
   questions: Question[];
   answers: Record<string, string>;
 }): Promise<{ data: Appel2Response; provider: string }> {
@@ -266,15 +272,20 @@ export async function callAppel2(ctx: {
     .map((q) => `Q: ${q.question}  R: ${ctx.answers[q.id] ?? '(pas de réponse)'}`)
     .join('\n');
 
+  const optionLines = ctx.options
+    .map((o) => `- ${o.id} : ${o.label}`)
+    .join('\n');
+
   const ctxBlock = await getUserContextBlock();
   const userMessage = `Situation : '${ctx.originalText}'
-Option A : ${ctx.optionALabel}
-Option B : ${ctx.optionBLabel}
+
+Options à évaluer :
+${optionLines}
 ${ctxBlock}
 Réponses aux questions :
 ${qaPairs}
 
-Génère 5 critères nommés depuis des éléments précis du texte.`;
+Génère 5 critères nommés depuis des éléments précis du texte. Pour chaque critère, score chaque option (en utilisant les IDs fournis comme clés dans option_scores).`;
 
   const { text, provider } = await callLLM(SYSTEM_APPEL_2, userMessage);
   return { data: parseResponse<Appel2Response>(text), provider };
@@ -290,11 +301,13 @@ RÈGLES :
 3. Le blindspot : quelque chose que la personne n'a PAS dit mais devrait regarder en face
 4. La deciding_question : la plus inconfortable, basée sur l'élément le plus sensible du texte
 5. Sois direct. Pas de bienveillance excessive.
-6. recommendation : reprend exactement le label de l'option
+6. recommendation : reprend exactement le label de l'option recommandée
 7. recommendation_reason : 2-3 phrases, cite des éléments précis. Ne répète pas les scores — l'app les affiche déjà.
 8. N'utilise JAMAIS de guillemets autour des mots ou expressions de l'utilisateur. Intègre-les directement dans tes phrases sans les encadrer.
 
 CONTRAINTES POUR LES % DE REGRET :
+- regret_score_chosen : risque de regret si on choisit l'option recommandée
+- regret_score_other : risque de regret si on choisit la 2ème option du classement (meilleure alternative)
 - Valeur entre 15 et 85 UNIQUEMENT (jamais 0 ni 100)
 - Chaque % est obligatoirement suivi d'un scénario précis qui cite des éléments du texte ou des réponses
 - Le scénario doit être plausible et personnalisé
@@ -302,7 +315,7 @@ CONTRAINTES POUR LES % DE REGRET :
 
 FORMAT — JSON pur sans markdown :
 {
-  "recommendation": "label exact de l'option",
+  "recommendation": "label exact de l'option recommandée",
   "recommendation_reason": "2-3 phrases avec citations",
   "biases": [
     { "name": "Nom du biais", "explanation": "Manifestation précise ici — cite le texte. 2 phrases." }
@@ -319,33 +332,43 @@ export interface Appel3Response extends Analysis {}
 
 export async function callAppel3(ctx: {
   originalText: string;
-  optionALabel: string;
-  optionBLabel: string;
-  scoreA: number;
-  scoreB: number;
+  options: Option[];
+  scores: Record<string, number>;
   labelNiveau: string;
   questions: Question[];
   answers: Record<string, string>;
   criteria: { label: string; id: string }[];
   weights: Record<string, number>;
-  userScoresA: Record<string, number>;
-  userScoresB: Record<string, number>;
+  userScores: Record<string, Record<string, number>>;
 }): Promise<{ data: Appel3Response; provider: string }> {
   const qaPairs = ctx.questions
     .map((q) => `Q: ${q.question}  R: ${ctx.answers[q.id] ?? '(pas de réponse)'}`)
     .join('\n');
 
-  const criteriaLines = ctx.criteria
-    .map(
-      (c) =>
-        `${c.label} : poids=${ctx.weights[c.id] ?? 5}, ${ctx.optionALabel}=${ctx.userScoresA[c.id] ?? 5}, ${ctx.optionBLabel}=${ctx.userScoresB[c.id] ?? 5}`
-    )
+  // Trier les options par score décroissant
+  const sortedOptions = [...ctx.options].sort(
+    (a, b) => (ctx.scores[b.id] ?? 0) - (ctx.scores[a.id] ?? 0)
+  );
+
+  const optionScoreLines = sortedOptions
+    .map((o, i) => `${i + 1}. ${o.label} (${o.id}) — score pondéré : ${ctx.scores[o.id] ?? 0}/100`)
     .join('\n');
 
+  const criteriaLines = ctx.criteria
+    .map((c) => {
+      const optScores = ctx.options
+        .map((o) => `${o.label}=${ctx.userScores[o.id]?.[c.id] ?? 5}`)
+        .join(', ');
+      return `${c.label} : poids=${ctx.weights[c.id] ?? 5}, ${optScores}`;
+    })
+    .join('\n');
+
+  const secondOption = sortedOptions[1];
   const ctxBlock = await getUserContextBlock();
   const userMessage = `Situation : '${ctx.originalText}'
-Option A : ${ctx.optionALabel} — score pondéré : ${ctx.scoreA}/100
-Option B : ${ctx.optionBLabel} — score pondéré : ${ctx.scoreB}/100
+
+Classement des options (du meilleur au moins bon score) :
+${optionScoreLines}
 Niveau de recommandation calculé : ${ctx.labelNiveau}
 ${ctxBlock}
 Réponses aux questions :
@@ -353,6 +376,8 @@ ${qaPairs}
 
 Critères et scores finaux :
 ${criteriaLines}
+
+Note : pour le regret, regret_score_chosen = option #1 du classement, regret_score_other = option #2 (${secondOption?.label ?? 'meilleure alternative'}).
 
 Produis l'analyse finale complète.`;
 

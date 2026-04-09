@@ -285,35 +285,38 @@ export default function QuestionsScreen() {
       // Appel 2 — critères
       const { data: result2, provider: p2 } = await callAppel2({
         originalText: store.originalText,
-        optionALabel: store.optionALabel,
-        optionBLabel: store.optionBLabel,
+        options: store.options,
         questions: store.questions,
         answers: allAnswers,
       });
       store.setAppel2Result(result2.criteria);
       store.setAiProvider('appel2', p2);
 
-      // Compute scores from Appel 2 defaults
+      // Compute scores from Appel 2 defaults (pour chaque option)
       const criteria = result2.criteria;
       const weights: Record<string, number> = {};
-      const scoresA: Record<string, number> = {};
-      const scoresB: Record<string, number> = {};
+      const userScores: Record<string, Record<string, number>> = {};
       for (const c of criteria) {
         weights[c.id] = c.default_weight;
-        scoresA[c.id] = c.score_a;
-        scoresB[c.id] = c.score_b;
+        for (const [optId, score] of Object.entries(c.option_scores)) {
+          if (!userScores[optId]) userScores[optId] = {};
+          userScores[optId][c.id] = score;
+        }
       }
       const totalPoids = criteria.reduce((sum, c) => sum + c.default_weight, 0);
-      const scoreA = totalPoids > 0
-        ? Math.round(criteria.reduce((sum, c) => sum + c.score_a * c.default_weight, 0) / totalPoids * 10)
-        : 0;
-      const scoreB = totalPoids > 0
-        ? Math.round(criteria.reduce((sum, c) => sum + c.score_b * c.default_weight, 0) / totalPoids * 10)
-        : 0;
-      const winner = scoreA >= scoreB ? store.optionALabel : store.optionBLabel;
-      const ecart = Math.abs(scoreA - scoreB);
+      const scores: Record<string, number> = {};
+      for (const opt of store.options) {
+        scores[opt.id] = totalPoids > 0
+          ? Math.round(criteria.reduce((sum, c) => sum + (c.option_scores[opt.id] ?? 5) * c.default_weight, 0) / totalPoids * 10)
+          : 0;
+      }
+      const sortedOpts = [...store.options].sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
+      const winner = sortedOpts[0]?.label ?? '';
+      const ecart = sortedOpts.length >= 2
+        ? (scores[sortedOpts[0].id] ?? 0) - (scores[sortedOpts[1].id] ?? 0)
+        : 100;
       const labelNiveau = ecart < 5
-        ? 'Décision serrée — les deux options se valent'
+        ? 'Décision serrée — les options se valent'
         : ecart < 15
           ? `Légère préférence pour ${winner}`
           : `Recommandation claire : ${winner}`;
@@ -323,17 +326,14 @@ export default function QuestionsScreen() {
       // Appel 3 — analyse finale
       const { data: result3, provider: p3 } = await callAppel3({
         originalText: store.originalText,
-        optionALabel: store.optionALabel,
-        optionBLabel: store.optionBLabel,
-        scoreA,
-        scoreB,
+        options: store.options,
+        scores,
         labelNiveau,
         questions: store.questions,
         answers: allAnswers,
         criteria,
         weights,
-        userScoresA: scoresA,
-        userScoresB: scoresB,
+        userScores,
       });
       store.setAnalysis(result3);
       store.setAiProvider('appel3', p3);
@@ -392,9 +392,12 @@ export default function QuestionsScreen() {
       <View style={styles.contextRow}>
         <View style={styles.contextPill}>
           <Text style={styles.contextText} numberOfLines={1}>
-            <Text style={styles.contextOpt}>{store.optionALabel}</Text>
-            <Text style={styles.contextVs}> vs </Text>
-            <Text style={styles.contextOpt}>{store.optionBLabel}</Text>
+            {store.options.map((o, i) => (
+              <Text key={o.id}>
+                {i > 0 && <Text style={styles.contextVs}> · </Text>}
+                <Text style={styles.contextOpt}>{o.label}</Text>
+              </Text>
+            ))}
           </Text>
         </View>
         <AiBadge provider={store.aiProviders.appel1} />
