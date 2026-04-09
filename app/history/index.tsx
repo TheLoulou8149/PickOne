@@ -14,7 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import {
-  ArrowLeft, LogOut, Trophy, ChevronRight,
+  ArrowLeft, Trophy, ChevronRight,
   Trash2, ArrowUpDown, CheckSquare, Square, X,
 } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
@@ -289,10 +289,6 @@ export default function HistoryScreen() {
     );
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-  }
-
   const sorted = sortDecisions(decisions, sortMode);
 
   return (
@@ -323,9 +319,6 @@ export default function HistoryScreen() {
             </View>
             <TouchableOpacity style={styles.headerAction} onPress={() => setShowSort(true)}>
               <ArrowUpDown size={18} color={Colors.textMuted} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerAction} onPress={handleLogout}>
-              <LogOut size={18} color={Colors.textMuted} />
             </TouchableOpacity>
           </>
         )}

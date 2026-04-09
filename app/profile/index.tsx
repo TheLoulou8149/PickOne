@@ -9,14 +9,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Modal,
-  Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, User, Lock, Brain, Check, MessageSquare } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
+import { FeedbackModal } from '@/components/FeedbackModal';
 
 type Tab = 'compte' | 'password' | 'contexte';
 
@@ -311,23 +310,7 @@ export default function ProfileScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
-      {/* Modal feedback bientôt disponible */}
-      <Modal visible={showFeedback} transparent animationType="fade" onRequestClose={() => setShowFeedback(false)}>
-        <Pressable style={feedbackStyles.overlay} onPress={() => setShowFeedback(false)}>
-          <View style={feedbackStyles.sheet}>
-            <View style={feedbackStyles.iconWrap}>
-              <MessageSquare size={28} color={Colors.primary} strokeWidth={1.5} />
-            </View>
-            <Text style={feedbackStyles.title}>Bientôt disponible</Text>
-            <Text style={feedbackStyles.body}>
-              Le formulaire de signalement de bugs et de suggestions arrive prochainement.{'\n\n'}En attendant, merci pour ta patience — chaque retour compte !
-            </Text>
-            <TouchableOpacity style={feedbackStyles.btn} onPress={() => setShowFeedback(false)} activeOpacity={0.85}>
-              <Text style={feedbackStyles.btnText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
+      <FeedbackModal visible={showFeedback} onClose={() => setShowFeedback(false)} />
 
       {/* Header */}
       <View style={styles.header}>
@@ -363,7 +346,21 @@ export default function ProfileScreen() {
         {activeTab === 'contexte' && <TabContexte />}
 
         {/* Feedback */}
-        <TouchableOpacity style={styles.feedbackBtn} onPress={() => setShowFeedback(true)} activeOpacity={0.75}>
+        <TouchableOpacity
+          style={styles.feedbackBtn}
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Alert.alert(
+                'Non disponible sur mobile',
+                'Envoie tes retours depuis la version navigateur de PickOne.',
+                [{ text: 'OK' }]
+              );
+              return;
+            }
+            setShowFeedback(true);
+          }}
+          activeOpacity={0.75}
+        >
           <MessageSquare size={15} color={Colors.textMuted} strokeWidth={1.5} />
           <Text style={styles.feedbackText}>Signaler un bug ou faire une suggestion</Text>
         </TouchableOpacity>
@@ -414,53 +411,3 @@ const styles = StyleSheet.create({
   },
 });
 
-const feedbackStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: '#00000060',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  sheet: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-    alignItems: 'center',
-    width: '100%',
-  },
-  iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: Colors.primaryPale,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: Typography.fontSizeLG,
-    fontWeight: '700' as const,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-  },
-  body: {
-    fontSize: Typography.fontSizeSM,
-    color: Colors.textSecondary,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: 13,
-    paddingHorizontal: 40,
-    marginTop: 4,
-  },
-  btnText: {
-    color: '#fff',
-    fontSize: Typography.fontSizeMD,
-    fontWeight: '700' as const,
-  },
-});

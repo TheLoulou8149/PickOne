@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Modal,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -22,6 +23,7 @@ import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel1 } from '@/services/llmService';
 import { MicButton } from '@/components/MicButton';
+import { FeedbackModal } from '@/components/FeedbackModal';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -33,6 +35,7 @@ export default function HomeScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const [showBetaBanner, setShowBetaBanner] = useState(true);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const canStart = text.trim().length > 20;
 
@@ -239,7 +242,27 @@ export default function HomeScreen() {
           <View style={styles.metaDot} />
           <Text style={styles.meta}>Analyse IA complète</Text>
         </View>
+
+        {/* Feedback */}
+        <TouchableOpacity
+          style={styles.feedbackLink}
+          onPress={() => {
+            if (Platform.OS !== 'web') {
+              Alert.alert(
+                'Non disponible sur mobile',
+                'Envoie tes retours depuis la version navigateur de PickOne.',
+                [{ text: 'OK' }]
+              );
+              return;
+            }
+            setShowFeedback(true);
+          }}
+        >
+          <Text style={styles.feedbackLinkText}>Bug ou suggestion ? Dis-nous →</Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      <FeedbackModal visible={showFeedback} onClose={() => setShowFeedback(false)} />
     </KeyboardAvoidingView>
   );
 }
@@ -397,6 +420,15 @@ const styles = StyleSheet.create({
     height: 3,
     borderRadius: 1.5,
     backgroundColor: Colors.textMuted,
+  },
+  feedbackLink: {
+    alignItems: 'center',
+    marginTop: Spacing.sm,
+    paddingVertical: Spacing.xs,
+  },
+  feedbackLinkText: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.textMuted,
   },
 });
 
