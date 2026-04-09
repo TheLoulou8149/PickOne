@@ -68,7 +68,7 @@ export interface DecisionState {
 
   // ─── UI ───────────────────────────────────────────────────────────────────
   isLoading: boolean;
-  phase: 'input' | 'questions' | 'weighting' | 'result';
+  phase: 'input' | 'questions' | 'result';
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   setAppel1Result: (data: {

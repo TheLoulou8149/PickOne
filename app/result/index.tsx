@@ -121,42 +121,91 @@ function ScoresCard({
   const winnerA = scoreA > scoreB;
   const winnerB = scoreB > scoreA;
 
+  const colorA = winnerA ? Colors.primary : Colors.textMuted;
+  const colorB = winnerB ? Colors.primary : Colors.textMuted;
+
   return (
     <Section>
       <SectionTitle>Scores pondérés</SectionTitle>
-      <View style={scoresStyles.row}>
-        <View style={scoresStyles.side}>
-          <Text style={[scoresStyles.score, winnerA && scoresStyles.scoreWinner]}>{scoreA}</Text>
-          <Text style={scoresStyles.label} numberOfLines={2}>{optionALabel}</Text>
-          {winnerA && <Text style={scoresStyles.winnerTag}>Gagnant</Text>}
+
+      {/* Jauge A */}
+      <View style={scoresStyles.gaugeBlock}>
+        <View style={scoresStyles.gaugeHeader}>
+          <Text style={[scoresStyles.gaugeName, { color: colorA }]}>{optionALabel}</Text>
+          <View style={scoresStyles.gaugeScoreWrap}>
+            <Text style={[scoresStyles.gaugeScore, { color: colorA }]}>{scoreA}</Text>
+            <Text style={scoresStyles.gaugeMax}>/100</Text>
+          </View>
         </View>
-        <View style={scoresStyles.sep}>
-          <Text style={scoresStyles.sepText}>/100</Text>
+        <View style={scoresStyles.track}>
+          <View style={[scoresStyles.fill, { width: `${scoreA}%`, backgroundColor: colorA }]} />
         </View>
-        <View style={scoresStyles.side}>
-          <Text style={[scoresStyles.score, winnerB && scoresStyles.scoreWinner]}>{scoreB}</Text>
-          <Text style={scoresStyles.label} numberOfLines={2}>{optionBLabel}</Text>
-          {winnerB && <Text style={scoresStyles.winnerTag}>Gagnant</Text>}
+        {winnerA && <Text style={scoresStyles.winnerTag}>Meilleur score</Text>}
+      </View>
+
+      {/* Jauge B */}
+      <View style={scoresStyles.gaugeBlock}>
+        <View style={scoresStyles.gaugeHeader}>
+          <Text style={[scoresStyles.gaugeName, { color: colorB }]}>{optionBLabel}</Text>
+          <View style={scoresStyles.gaugeScoreWrap}>
+            <Text style={[scoresStyles.gaugeScore, { color: colorB }]}>{scoreB}</Text>
+            <Text style={scoresStyles.gaugeMax}>/100</Text>
+          </View>
         </View>
+        <View style={scoresStyles.track}>
+          <View style={[scoresStyles.fill, { width: `${scoreB}%`, backgroundColor: colorB }]} />
+        </View>
+        {winnerB && <Text style={scoresStyles.winnerTag}>Meilleur score</Text>}
       </View>
     </Section>
   );
 }
 
 const scoresStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center' },
-  side: { flex: 1, alignItems: 'center', gap: 4 },
-  score: {
-    fontSize: 52,
-    fontWeight: Typography.fontWeightBlack,
-    color: Colors.textMuted,
-    lineHeight: 56,
+  gaugeBlock: {
+    gap: Spacing.xs,
   },
-  scoreWinner: { color: Colors.textPrimary },
-  label: { fontSize: Typography.fontSizeSM, color: Colors.textMuted, textAlign: 'center' },
-  winnerTag: { fontSize: Typography.fontSizeXS, color: Colors.success, fontWeight: Typography.fontWeightSemiBold },
-  sep: { paddingHorizontal: Spacing.md },
-  sepText: { fontSize: Typography.fontSizeSM, color: Colors.textMuted },
+  gaugeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  gaugeName: {
+    fontSize: Typography.fontSizeMD,
+    fontWeight: Typography.fontWeightBold,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  gaugeScoreWrap: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    marginLeft: Spacing.sm,
+  },
+  gaugeScore: {
+    fontSize: Typography.fontSize3XL,
+    fontWeight: Typography.fontWeightBlack,
+    lineHeight: Typography.fontSize3XL * 1.1,
+  },
+  gaugeMax: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textMuted,
+  },
+  track: {
+    height: 10,
+    backgroundColor: Colors.border,
+    borderRadius: BorderRadius.full,
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    borderRadius: BorderRadius.full,
+  },
+  winnerTag: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.primary,
+    fontWeight: Typography.fontWeightSemiBold,
+  },
 });
 
 // ─── 3. Cohérence instinct / logique ──────────────────────────────────────────
@@ -216,7 +265,7 @@ function CriteriaBarometers({
         const w = weights[c.id] ?? c.default_weight;
         return (
           <View key={c.id} style={bmStyles.row}>
-            <Text style={bmStyles.label} numberOfLines={1}>{c.label}</Text>
+            <Text style={bmStyles.label}>{c.label}</Text>
             <View style={bmStyles.barWrap}>
               <View style={bmStyles.barTrack}>
                 <View style={[bmStyles.barFill, { width: `${w * 10}%` }]} />
@@ -233,7 +282,7 @@ function CriteriaBarometers({
 const bmStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: Spacing.sm,
   },
   label: {
