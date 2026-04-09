@@ -32,13 +32,22 @@ Le flux est linéaire en 3 écrans. Il n'y a pas d'étape intermédiaire de pond
 ### 1. Accueil — `app/index.tsx`
 
 - Header : icône Zap (orange), nom "PickOne", tagline "Décide mieux. Regrette moins."
-- Card "Décris ta situation" avec textarea multiline (min. 160px de hauteur)
+- Card "Décris ta situation" avec textarea multiline (min. 160px) + **bouton micro circulaire**
 - Placeholder d'exemple : situation CDI vs Startup avec chiffres concrets
 - Compteur de caractères : gris si < 20, vert + "✓" si ≥ 20
-- Bouton "Analyser ma situation →" (désactivé si < 20 chars, spinner pendant le chargement)
+- Bouton "Analyser ma situation →" (désactivé si < 20 chars, spinner pendant le chargement, désactivé aussi pendant l'enregistrement vocal)
 - Message d'erreur affiché sous la card si l'appel échoue
 - Footer : "3 étapes · ~2 min · Analyse IA complète" + badge IA (provider de l'Appel 1)
 - Sur submit : appelle `callAppel1`, stocke le résultat dans le store, navigue vers `/dilemma`
+
+**Saisie vocale (V4) :**
+- Bouton micro circulaire à droite du textarea
+- Appui → demande permission micro + reconnaissance vocale (langue `fr-FR`)
+- Pendant l'enregistrement : 3 anneaux animés qui pulsent en onde (Reanimated), textarea en surbrillance orange, texte interimaire affiché en temps réel
+- Appui à nouveau (icône `MicOff`) → arrête l'enregistrement
+- Résultat final : transcription ajoutée/concaténée dans le textarea pour relecture avant validation
+- Erreur de permission ou de reconnaissance → message d'erreur standard
+- Technologie : `expo-speech-recognition` (reconnaissance native iOS/Android, sans API key supplémentaire)
 
 ---
 

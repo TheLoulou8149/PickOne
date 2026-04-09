@@ -10,10 +10,15 @@ import {
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ChevronRight, ChevronLeft } from 'lucide-react-native';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel2, callAppel3 } from '@/services/llmService';
 import { AiBadge } from '@/components/AiBadge';
+import { MicButton } from '@/components/MicButton';
 import type { Question } from '@/store/decisionStore';
 
 // ─── Composant slider segmenté (1-10) ─────────────────────────────────────────
@@ -76,10 +81,16 @@ function QuestionInput({
   question,
   value,
   onChange,
+  isRecording,
+  interimText,
+  onToggleRecording,
 }: {
   question: Question;
   value: string;
   onChange: (v: string) => void;
+  isRecording?: boolean;
+  interimText?: string;
+  onToggleRecording?: () => void;
 }) {
   if (question.type === 'choice' && question.options) {
     return (
@@ -112,16 +123,23 @@ function QuestionInput({
     );
   }
 
+  // open — avec bouton micro
   return (
-    <TextInput
-      style={inputStyles.openInput}
-      placeholder="Ta réponse…"
-      placeholderTextColor={Colors.textMuted}
-      value={value}
-      onChangeText={onChange}
-      multiline
-      textAlignVertical="top"
-    />
+    <View style={inputStyles.openWrap}>
+      <TextInput
+        style={[inputStyles.openInput, isRecording && inputStyles.openInputRecording]}
+        placeholder={isRecording ? 'Parle maintenant…' : 'Ta réponse…'}
+        placeholderTextColor={isRecording ? Colors.primary + '80' : Colors.textMuted}
+        value={isRecording && interimText ? interimText : value}
+        onChangeText={!isRecording ? onChange : undefined}
+        multiline
+        textAlignVertical="top"
+        editable={!isRecording}
+      />
+      {onToggleRecording && (
+        <MicButton isRecording={!!isRecording} onPress={onToggleRecording} />
+      )}
+    </View>
   );
 }
 
@@ -147,7 +165,13 @@ const inputStyles = StyleSheet.create({
     color: Colors.primaryLight,
     fontWeight: Typography.fontWeightSemiBold,
   },
+  openWrap: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
+  },
   openInput: {
+    flex: 1,
     backgroundColor: Colors.surface,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -156,6 +180,10 @@ const inputStyles = StyleSheet.create({
     fontSize: Typography.fontSizeMD,
     padding: Spacing.md,
     minHeight: 100,
+  },
+  openInputRecording: {
+    borderColor: Colors.primary + '60',
+    backgroundColor: Colors.primary + '06',
   },
 });
 
@@ -169,6 +197,9 @@ export default function QuestionsScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [interimText, setInterimText] = useState('');
+
   const questions = store.questions;
   const total = questions.length;
   const current = questions[currentIdx];
@@ -176,6 +207,49 @@ export default function QuestionsScreen() {
   const currentAnswer = localAnswers[current?.id ?? ''] ?? '';
   const isLast = currentIdx === total - 1;
   const hasAnswer = currentAnswer.trim().length > 0 || current?.type === 'slider';
+
+  // ─── Speech recognition ──────────────────────────────────────────────────
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results?.[0]?.transcript ?? '';
+    if (event.isFinal) {
+      setAnswer((localAnswers[current?.id ?? ''] ?? '') + (localAnswers[current?.id ?? ''] ? ' ' + transcript : transcript));
+      setInterimText('');
+    } else {
+      setInterimText(transcript);
+    }
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsRecording(false);
+    setInterimText('');
+  });
+
+  useSpeechRecognitionEvent('error', () => {
+    setIsRecording(false);
+    setInterimText('');
+  });
+
+  async function toggleRecording() {
+    if (isRecording) {
+      ExpoSpeechRecognitionModule.stop();
+      setIsRecording(false);
+      return;
+    }
+    const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!granted) return;
+    setIsRecording(true);
+    ExpoSpeechRecognitionModule.start({
+      lang: 'fr-FR',
+      interimResults: true,
+      continuous: true,
+      androidIntentOptions: {
+        EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS: 15000,
+        EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS: 5000,
+        EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS: 5000,
+      },
+    });
+  }
 
   function setAnswer(val: string) {
     if (!current) return;
@@ -336,6 +410,9 @@ export default function QuestionsScreen() {
             question={current}
             value={current.type === 'slider' && !localAnswers[current.id] ? '5' : currentAnswer}
             onChange={setAnswer}
+            isRecording={current.type === 'open' ? isRecording : false}
+            interimText={interimText}
+            onToggleRecording={current.type === 'open' ? toggleRecording : undefined}
           />
         </View>
       </View>

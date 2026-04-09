@@ -35,6 +35,13 @@
         {
           "backgroundColor": "#0D0D0F"
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "PickOne utilise le micro pour retranscrire ton dilemme à l'oral.",
+          "speechRecognitionPermission": "PickOne utilise la reconnaissance vocale pour saisir ton dilemme."
+        }
       ]
     ],
     "experiments": {
