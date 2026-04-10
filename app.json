@@ -14,14 +14,21 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.pickone.app"
+      "bundleIdentifier": "com.pickone.app",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "PickOne utilise la reconnaissance vocale pour saisir ton dilemme.",
+        "NSMicrophoneUsageDescription": "PickOne utilise le micro pour retranscrire ton dilemme à l'oral."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0D0D0F"
       },
-      "package": "com.pickone.app"
+      "package": "com.pickone.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -46,6 +53,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9dc9d3e6-6442-40b4-a7f6-5213ab2df5d0"
+      }
     }
   }
 }
