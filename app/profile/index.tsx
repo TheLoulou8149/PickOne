@@ -12,17 +12,19 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, User, Lock, Brain, Check, MessageSquare } from 'lucide-react-native';
+import { ArrowLeft, User, Lock, Brain, Check, MessageSquare, TrendingUp, Sparkles } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { FeedbackModal } from '@/components/FeedbackModal';
+import { callProfilCognitif, type ProfilCognitifResponse } from '@/services/llmService';
 
-type Tab = 'compte' | 'password' | 'contexte';
+type Tab = 'compte' | 'password' | 'contexte' | 'cognitif';
 
 const TABS: { key: Tab; label: string; icon: any }[] = [
   { key: 'compte', label: 'Compte', icon: User },
-  { key: 'password', label: 'Mot de passe', icon: Lock },
-  { key: 'contexte', label: 'Contexte IA', icon: Brain },
+  { key: 'password', label: 'Sécurité', icon: Lock },
+  { key: 'contexte', label: 'Contexte', icon: Brain },
+  { key: 'cognitif', label: 'Cognitif', icon: TrendingUp },
 ];
 
 // ─── Onglet Compte ────────────────────────────────────────────────────────────
@@ -246,6 +248,370 @@ function TabContexte() {
   );
 }
 
+// ─── Onglet Profil Cognitif ───────────────────────────────────────────────────
+
+type CogStatus = 'idle' | 'loading' | 'done' | 'error';
+
+interface LocalStats {
+  totalDecisions: number;
+  instinctAlignedPct: number;
+  instinctDecisionsCount: number;
+  topBiases: { name: string; count: number }[];
+}
+
+function computeLocalStats(decisions: any[]): LocalStats {
+  const withCoherence = decisions.filter(
+    (d) => d.message_coherence && !d.message_coherence.includes("n'a pas"),
+  );
+  const instinctAligned = withCoherence.filter((d) =>
+    d.message_coherence.startsWith('Ta logique'),
+  );
+  const instinctAlignedPct =
+    withCoherence.length > 0
+      ? Math.round((instinctAligned.length / withCoherence.length) * 100)
+      : 0;
+
+  const biasesCounts: Record<string, number> = {};
+  for (const d of decisions) {
+    if (d.analysis?.biases && Array.isArray(d.analysis.biases)) {
+      for (const bias of d.analysis.biases) {
+        if (bias.name) biasesCounts[bias.name] = (biasesCounts[bias.name] ?? 0) + 1;
+      }
+    }
+  }
+  const topBiases = Object.entries(biasesCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+
+  return { totalDecisions: decisions.length, instinctAlignedPct, instinctDecisionsCount: withCoherence.length, topBiases };
+}
+
+function TabProfilCognitif() {
+  const [status, setStatus] = useState<CogStatus>('idle');
+  const [localStats, setLocalStats] = useState<LocalStats | null>(null);
+  const [aiProfile, setAiProfile] = useState<ProfilCognitifResponse | null>(null);
+
+  async function handleGenerate() {
+    setStatus('loading');
+    try {
+      const { data, error } = await supabase
+        .from('decisions')
+        .select('dilemma, context_summary, option_a, option_b, winner, message_coherence, analysis');
+      if (error || !data) throw new Error('Erreur de chargement');
+      if (data.length === 0) {
+        setStatus('idle');
+        return;
+      }
+      const stats = computeLocalStats(data);
+      setLocalStats(stats);
+      const { data: aiData } = await callProfilCognitif(data);
+      setAiProfile(aiData);
+      setStatus('done');
+    } catch {
+      setStatus('error');
+    }
+  }
+
+  // ── État initial ──
+  if (status === 'idle') {
+    return (
+      <View style={cogStyles.idleWrap}>
+        <View style={cogStyles.idleIcon}>
+          <TrendingUp size={32} color={Colors.primary} />
+        </View>
+        <Text style={cogStyles.idleTitle}>Ton profil de décideur</Text>
+        <Text style={cogStyles.idleHint}>
+          L'IA analyse l'ensemble de tes décisions passées pour révéler tes patterns, tes biais et ton style de pensée.
+        </Text>
+        <TouchableOpacity style={cogStyles.generateBtn} onPress={handleGenerate}>
+          <Sparkles size={16} color="#fff" />
+          <Text style={cogStyles.generateBtnText}>Obtenir mon profil cognitif</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ── Chargement ──
+  if (status === 'loading') {
+    return (
+      <View style={cogStyles.idleWrap}>
+        <ActivityIndicator color={Colors.primary} size="large" />
+        <Text style={cogStyles.loadingText}>Analyse en cours…</Text>
+        <Text style={cogStyles.loadingHint}>L'IA lit tes décisions passées</Text>
+      </View>
+    );
+  }
+
+  // ── Erreur ──
+  if (status === 'error') {
+    return (
+      <View style={cogStyles.idleWrap}>
+        <Text style={cogStyles.idleTitle}>Une erreur s'est produite</Text>
+        <TouchableOpacity style={cogStyles.generateBtn} onPress={handleGenerate}>
+          <Text style={cogStyles.generateBtnText}>Réessayer</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // ── Résultats ──
+  return (
+    <View style={tabStyles.container}>
+
+      {/* Sujets récurrents */}
+      {aiProfile?.sujets && aiProfile.sujets.length > 0 && (
+        <View style={cogStyles.card}>
+          <Text style={cogStyles.cardLabel}>SUJETS RÉCURRENTS</Text>
+          <View style={cogStyles.chipsWrap}>
+            {aiProfile.sujets.map((s) => (
+              <View key={s.label} style={cogStyles.chip}>
+                <Text style={cogStyles.chipLabel}>{s.label}</Text>
+                <Text style={cogStyles.chipCount}>{s.occurrences}×</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Observations IA */}
+      {aiProfile?.observations && aiProfile.observations.length > 0 && (
+        <View style={cogStyles.card}>
+          <Text style={cogStyles.cardLabel}>CE QU'ON REMARQUE</Text>
+          <View style={{ gap: Spacing.md }}>
+            {aiProfile.observations.map((obs, i) => (
+              <View key={i} style={cogStyles.obsRow}>
+                <View style={cogStyles.obsAccent} />
+                <View style={{ flex: 1, gap: 3 }}>
+                  <Text style={cogStyles.obsTitle}>{obs.titre}</Text>
+                  <Text style={cogStyles.obsDetail}>{obs.detail}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Profil synthèse */}
+      {aiProfile?.profil_synthese && (
+        <View style={cogStyles.profilCard}>
+          <Text style={cogStyles.cardLabel}>TON PROFIL DE DÉCIDEUR</Text>
+          <Text style={cogStyles.profilText}>{aiProfile.profil_synthese}</Text>
+        </View>
+      )}
+
+      {/* Question miroir */}
+      {aiProfile?.question_miroir && (
+        <View style={cogStyles.mirrorCard}>
+          <Text style={cogStyles.mirrorLabel}>LA QUESTION QUE TU ÉVITES</Text>
+          <Text style={cogStyles.mirrorText}>{aiProfile.question_miroir}</Text>
+        </View>
+      )}
+
+      {/* Instinct vs Logique */}
+      {localStats && localStats.instinctDecisionsCount > 0 && (
+        <View style={cogStyles.card}>
+          <Text style={cogStyles.cardLabel}>INSTINCT VS LOGIQUE</Text>
+          <Text style={cogStyles.instinctStat}>
+            Ton instinct et ta logique s'accordent dans{' '}
+            <Text style={{ color: Colors.primary, fontWeight: Typography.fontWeightBold }}>
+              {localStats.instinctAlignedPct}% des cas
+            </Text>
+          </Text>
+          <View style={cogStyles.splitBar}>
+            <View style={[cogStyles.splitLeft, { flex: localStats.instinctAlignedPct || 1 }]} />
+            <View style={[cogStyles.splitRight, { flex: (100 - localStats.instinctAlignedPct) || 1 }]} />
+          </View>
+          <View style={cogStyles.splitLegend}>
+            <View style={cogStyles.legendItem}>
+              <View style={[cogStyles.dot, { backgroundColor: Colors.primary }]} />
+              <Text style={cogStyles.legendText}>Alignés ({localStats.instinctAlignedPct}%)</Text>
+            </View>
+            <View style={cogStyles.legendItem}>
+              <View style={[cogStyles.dot, { backgroundColor: Colors.border }]} />
+              <Text style={cogStyles.legendText}>Divergents ({100 - localStats.instinctAlignedPct}%)</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Mur des biais */}
+      {localStats && localStats.topBiases.length > 0 && (
+        <View style={cogStyles.card}>
+          <Text style={cogStyles.cardLabel}>MUR DES BIAIS</Text>
+          <Text style={cogStyles.cardHint}>Tes biais cognitifs les plus fréquents</Text>
+          <View style={{ gap: Spacing.sm, marginTop: Spacing.xs }}>
+            {localStats.topBiases.map((bias, i) => (
+              <View key={bias.name} style={cogStyles.biasRow}>
+                <View style={cogStyles.biasRank}>
+                  <Text style={cogStyles.biasRankText}>{i + 1}</Text>
+                </View>
+                <Text style={cogStyles.biasName} numberOfLines={2}>{bias.name}</Text>
+                <View style={cogStyles.biasCount}>
+                  <Text style={cogStyles.biasCountText}>{bias.count}×</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      <Text style={cogStyles.basedOn}>
+        Basé sur {localStats?.totalDecisions ?? 0} décision{(localStats?.totalDecisions ?? 0) > 1 ? 's' : ''} analysées
+      </Text>
+
+      {/* Regénérer */}
+      <TouchableOpacity style={cogStyles.regenBtn} onPress={handleGenerate}>
+        <Text style={cogStyles.regenText}>Regénérer l'analyse</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const cogStyles = StyleSheet.create({
+  // ── Idle / Loading ──
+  idleWrap: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+    gap: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  idleIcon: {
+    width: 64, height: 64, borderRadius: 32,
+    backgroundColor: Colors.primaryPale,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  idleTitle: {
+    fontSize: Typography.fontSizeLG,
+    fontWeight: Typography.fontWeightBold,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  idleHint: {
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  generateBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.primary, borderRadius: BorderRadius.md,
+    paddingVertical: Spacing.md, paddingHorizontal: Spacing.xl,
+    marginTop: Spacing.sm,
+  },
+  generateBtnText: {
+    color: '#fff', fontSize: Typography.fontSizeMD,
+    fontWeight: Typography.fontWeightBold,
+  },
+  loadingText: {
+    fontSize: Typography.fontSizeMD, fontWeight: Typography.fontWeightSemiBold,
+    color: Colors.textPrimary, marginTop: Spacing.sm,
+  },
+  loadingHint: { fontSize: Typography.fontSizeSM, color: Colors.textMuted },
+
+  // ── Cards communes ──
+  card: {
+    backgroundColor: Colors.surface, borderRadius: BorderRadius.md,
+    padding: Spacing.lg, borderWidth: 1, borderColor: Colors.border,
+    gap: Spacing.sm,
+  },
+  cardLabel: {
+    fontSize: 10, fontWeight: Typography.fontWeightBold,
+    color: Colors.textMuted, letterSpacing: 1.1, textTransform: 'uppercase',
+  },
+  cardHint: { fontSize: Typography.fontSizeSM, color: Colors.textMuted },
+
+  // ── Sujets chips ──
+  chipsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  chip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: Colors.primaryPale, borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.md, paddingVertical: 6,
+    borderWidth: 1, borderColor: Colors.primary + '30',
+  },
+  chipLabel: {
+    fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightSemiBold,
+    color: Colors.primary,
+  },
+  chipCount: { fontSize: Typography.fontSizeXS, color: Colors.primaryLight },
+
+  // ── Observations ──
+  obsRow: { flexDirection: 'row', gap: Spacing.sm },
+  obsAccent: {
+    width: 3, borderRadius: 2, backgroundColor: Colors.primary,
+    alignSelf: 'stretch',
+  },
+  obsTitle: {
+    fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightBold,
+    color: Colors.textPrimary,
+  },
+  obsDetail: {
+    fontSize: Typography.fontSizeSM, color: Colors.textSecondary, lineHeight: 19,
+  },
+
+  // ── Profil synthèse ──
+  profilCard: {
+    backgroundColor: Colors.surfaceBeige, borderRadius: BorderRadius.md,
+    padding: Spacing.lg, borderWidth: 1, borderColor: Colors.borderBeige, gap: Spacing.sm,
+  },
+  profilText: {
+    fontSize: Typography.fontSizeSM, color: Colors.textSecondary,
+    lineHeight: 21, fontStyle: 'italic',
+  },
+
+  // ── Question miroir ──
+  mirrorCard: {
+    backgroundColor: Colors.textPrimary, borderRadius: BorderRadius.md,
+    padding: Spacing.lg, gap: Spacing.sm,
+  },
+  mirrorLabel: {
+    fontSize: 10, fontWeight: Typography.fontWeightBold,
+    color: Colors.primary, letterSpacing: 1.1, textTransform: 'uppercase',
+  },
+  mirrorText: {
+    fontSize: Typography.fontSizeMD, fontWeight: Typography.fontWeightSemiBold,
+    color: '#FFFFFF', lineHeight: 22,
+  },
+
+  // ── Instinct ──
+  instinctStat: { fontSize: Typography.fontSizeSM, color: Colors.textSecondary, lineHeight: 20 },
+  splitBar: {
+    height: 8, borderRadius: BorderRadius.full, flexDirection: 'row',
+    overflow: 'hidden', marginTop: Spacing.xs,
+  },
+  splitLeft: { backgroundColor: Colors.primary },
+  splitRight: { backgroundColor: Colors.surfaceGray },
+  splitLegend: { flexDirection: 'row', justifyContent: 'space-between' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: Typography.fontSizeXS, color: Colors.textMuted },
+
+  // ── Biais ──
+  biasRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.xs },
+  biasRank: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: Colors.primaryPale, alignItems: 'center', justifyContent: 'center',
+  },
+  biasRankText: { fontSize: Typography.fontSizeXS, fontWeight: Typography.fontWeightBold, color: Colors.primary },
+  biasName: { flex: 1, fontSize: Typography.fontSizeSM, color: Colors.textPrimary },
+  biasCount: {
+    backgroundColor: Colors.surfaceGray, borderRadius: BorderRadius.full,
+    paddingHorizontal: Spacing.sm, paddingVertical: 2,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  biasCountText: { fontSize: Typography.fontSizeXS, fontWeight: Typography.fontWeightBold, color: Colors.textSecondary },
+
+  // ── Footer ──
+  basedOn: { fontSize: Typography.fontSizeXS, color: Colors.textMuted, textAlign: 'center' },
+  regenBtn: {
+    alignItems: 'center', paddingVertical: Spacing.sm,
+  },
+  regenText: {
+    fontSize: Typography.fontSizeSM, color: Colors.textMuted,
+    textDecorationLine: 'underline',
+  },
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -344,6 +710,7 @@ export default function ProfileScreen() {
         {activeTab === 'compte' && <TabCompte />}
         {activeTab === 'password' && <TabPassword />}
         {activeTab === 'contexte' && <TabContexte />}
+        {activeTab === 'cognitif' && <TabProfilCognitif />}
 
         {/* Feedback */}
         <TouchableOpacity

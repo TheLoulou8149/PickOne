@@ -327,6 +327,67 @@ FORMAT — JSON pur sans markdown :
   "alternative_strategy": "optionnel — seulement si options insatisfaisantes (score max < 40 ou regret > 65%). Une 3ème voie concrète ancrée dans la situation. 2-3 phrases."
 }`;
 
+// ─── APPEL PROFIL COGNITIF ────────────────────────────────────────────────────
+
+export interface ProfilCognitifResponse {
+  sujets: { label: string; occurrences: number }[];
+  observations: { titre: string; detail: string }[];
+  profil_synthese: string;
+  question_miroir: string;
+}
+
+const SYSTEM_PROFIL_COGNITIF = `Tu es un psychologue comportemental expert en prise de décision.
+Tu vas analyser l'historique des décisions d'un utilisateur pour dresser son profil cognitif.
+
+FORMAT — JSON pur sans markdown :
+{
+  "sujets": [
+    { "label": "thématique courte (2 mots max)", "occurrences": N }
+  ],
+  "observations": [
+    { "titre": "titre court (5 mots max)", "detail": "2 phrases percutantes ancrées dans des dilemmes réels de l'historique" }
+  ],
+  "profil_synthese": "2-3 phrases résumant ce profil de décideur. Direct, honnête, pas de bienveillance excessive.",
+  "question_miroir": "1 question inconfortable qui pointe le pattern sous-jacent."
+}
+
+RÈGLES :
+1. sujets : 3 à 5 grandes thématiques récurrentes dans les dilemmes
+2. observations : 2 à 4 patterns comportementaux, biais ou tendances détectés — cite des éléments précis de l'historique
+3. profil_synthese : synthèse honnête du mode de décision de cette personne
+4. question_miroir : la question que l'utilisateur évite de se poser, issue de ses vrais dilemmes
+5. Sois direct. Pas de généralités. Ancre chaque point dans des éléments concrets de l'historique.`;
+
+export async function callProfilCognitif(decisions: {
+  dilemma: string | null;
+  context_summary: string | null;
+  option_a: string;
+  option_b: string;
+  winner: string | null;
+  analysis: any;
+}[]): Promise<{ data: ProfilCognitifResponse; provider: string }> {
+  const decisionsBlock = decisions
+    .map((d, i) => {
+      const sujet = d.dilemma ?? d.context_summary ?? 'Dilemme sans titre';
+      const biais = d.analysis?.biases?.map((b: any) => b.name).join(', ') ?? '';
+      return `Décision ${i + 1} : "${sujet}" — Choix entre ${d.option_a} et ${d.option_b}. Gagnant : ${d.winner ?? '?'}${biais ? `. Biais détectés : ${biais}` : ''}.`;
+    })
+    .join('\n');
+
+  const ctxBlock = await getUserContextBlock();
+  const userMessage = `Historique des décisions (${decisions.length} au total) :
+
+${decisionsBlock}
+${ctxBlock}
+
+Analyse cet historique et produis le profil cognitif complet de cet utilisateur.`;
+
+  const { text, provider } = await callLLM(SYSTEM_PROFIL_COGNITIF, userMessage);
+  return { data: parseResponse<ProfilCognitifResponse>(text), provider };
+}
+
+// ─── APPEL 3 — Analyse finale ─────────────────────────────────────────────────
+
 export interface Appel3Response extends Analysis {}
 
 export async function callAppel3(ctx: {
