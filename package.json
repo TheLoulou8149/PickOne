@@ -34,6 +34,7 @@
   "devDependencies": {
     "@babel/core": "^7.24.0",
     "@types/react": "~19.1.10",
+    "babel-plugin-transform-import-meta": "^2.3.3",
     "typescript": "~5.9.2"
   },
   "private": true
