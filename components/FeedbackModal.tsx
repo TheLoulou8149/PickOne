@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 
@@ -40,9 +39,8 @@ export function FeedbackModal({ visible, onClose }: Props) {
     if (message.trim().length < 5 || status === 'loading') return;
     setStatus('loading');
     try {
-      // Sur web : route API locale. Sur natif : même URL relative (fonctionne en dev Expo).
-      const url = Platform.OS === 'web' ? '/api/feedback' : '/api/feedback';
-      const res = await fetch(url, {
+      const backendUrl = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
+      const res = await fetch(`${backendUrl}/api/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, message }),

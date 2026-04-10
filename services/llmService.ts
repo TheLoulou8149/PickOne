@@ -1,12 +1,8 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
 import type { Option, Question, Criterion, Analysis } from '@/store/decisionStore';
 import { supabase } from '@/lib/supabase';
 
-const IS_WEB = Platform.OS === 'web';
-
-
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL ?? '';
 
 const TIMEOUT = 50000;
 
@@ -52,48 +48,20 @@ function parseResponse<T>(raw: string): T {
 // ─── Appels API par provider ──────────────────────────────────────────────────
 
 
-async function callGemini(systemPrompt: string, userMessage: string): Promise<string> {
-  if (IS_WEB) {
-    const response = await axios.post(
-      '/api/llm',
-      { target: 'gemini', systemPrompt, userMessage },
-      { timeout: TIMEOUT }
-    );
-    return response.data.text;
-  }
-  const response = await axios.post(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ parts: [{ text: userMessage }] }],
-      generationConfig: { maxOutputTokens: 2000 },
-    },
-    { timeout: TIMEOUT, headers: { 'content-type': 'application/json' } }
-  );
-  return response.data.candidates[0].content.parts[0].text;
-}
-
-// ─── Appel LLM : Gemini en premier, fallback Anthropic ───────────────────────
+// ─── Appel LLM via backend ────────────────────────────────────────────────────
 
 async function callLLM(
   systemPrompt: string,
   userMessage: string,
   attempt = 0
 ): Promise<{ text: string; provider: 'gemini' | 'anthropic' }> {
-  // Sur web : un seul appel, le fallback Gemini→Anthropic est géré côté serveur
-  if (IS_WEB) {
+  try {
     const response = await axios.post(
-      '/api/llm',
+      `${BACKEND_URL}/api/llm`,
       { systemPrompt, userMessage },
       { timeout: TIMEOUT }
     );
     return { text: response.data.text, provider: response.data.provider };
-  }
-
-  // Sur natif : Gemini uniquement
-  try {
-    const text = await callGemini(systemPrompt, userMessage);
-    return { text, provider: 'gemini' };
   } catch (err: any) {
     const status = err?.response?.status;
     if (status === 429 && attempt < 2) {
