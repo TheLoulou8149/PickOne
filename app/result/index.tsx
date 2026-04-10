@@ -738,6 +738,11 @@ export default function ResultScreen() {
         <RotateCcw size={14} color={Colors.textMuted} />
         <Text style={styles.restartText}>Nouveau dilemme</Text>
       </TouchableOpacity>
+
+      {/* Disclaimer IA */}
+      <Text style={styles.disclaimer}>
+        ⚠️ L'IA peut se tromper. Cette analyse est une aide à la réflexion, pas un conseil définitif.
+      </Text>
     </ScrollView>
   );
 }
@@ -767,5 +772,12 @@ const styles = StyleSheet.create({
   restartText: {
     fontSize: Typography.fontSizeSM,
     color: Colors.textMuted,
+  },
+  disclaimer: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 16,
+    paddingHorizontal: Spacing.md,
   },
 });

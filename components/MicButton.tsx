@@ -1,4 +1,4 @@
-import { TouchableOpacity, StyleSheet, View } from 'react-native';
+import { TouchableOpacity, StyleSheet, View, Platform } from 'react-native';
 import { Colors } from '@/constants/theme';
 
 // Mic icon drawn as SVG path via react-native-svg would require extra dep.
@@ -57,13 +57,15 @@ export function MicButton({
   isRecording: boolean;
   onPress: () => void;
 }) {
-  const iconColor = isRecording ? '#fff' : Colors.textPrimary;
+  const isWeb = Platform.OS === 'web';
+  const iconColor = isRecording ? '#fff' : isWeb ? Colors.textMuted : Colors.textPrimary;
 
   return (
     <TouchableOpacity
-      style={[styles.btn, isRecording && styles.btnActive]}
-      onPress={onPress}
-      activeOpacity={0.75}
+      style={[styles.btn, isRecording && styles.btnActive, isWeb && styles.btnDisabled]}
+      onPress={isWeb ? undefined : onPress}
+      activeOpacity={isWeb ? 1 : 0.75}
+      disabled={isWeb}
     >
       <MicIcon color={iconColor} />
     </TouchableOpacity>
@@ -84,5 +86,8 @@ const styles = StyleSheet.create({
   btnActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
+  },
+  btnDisabled: {
+    opacity: 0.35,
   },
 });
