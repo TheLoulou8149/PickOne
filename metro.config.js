@@ -4,7 +4,7 @@ const config = getDefaultConfig(__dirname);
 
 config.transformer.transformIgnorePatterns = [
   'node_modules/(?!(react-native|react-native-web|@react-native|expo|@expo|' +
-  'react-native-reanimated|lucide-react-native|moti|@legendapp|@supabase)/)',
+  'react-native-reanimated|lucide-react-native|moti|@legendapp|@supabase|zustand)/)',
 ];
 
 const originalResolveRequest = config.resolver.resolveRequest;
