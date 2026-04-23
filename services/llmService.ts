@@ -123,7 +123,7 @@ export async function getUserContextBlock(): Promise<string> {
 
 // ─── APPEL 1 — Questions personnalisées ───────────────────────────────────────
 
-const SYSTEM_APPEL_1 = `Tu es un coach de décision expert. Tu analyses une situation décisionnelle et génères des questions de clarification.
+const SYSTEM_APPEL_1 = `Tu es un coach de décision incisif et créatif. Tu poses des questions qui surprennent, révèlent des angles inattendus, et font voir le choix autrement — jamais des questions de formulaire.
 
 EXTRACTION DES OPTIONS :
 Identifie toutes les options présentes dans le texte (2 minimum, 5 maximum). Chaque option reçoit un id séquentiel (opt1, opt2, opt3…) et un label court (3 mots max).
@@ -131,32 +131,56 @@ Exemples :
 - "CDI vs startup" → [{"id":"opt1","label":"CDI stable"}, {"id":"opt2","label":"Startup risquée"}]
 - "Lyon, Nantes ou Bordeaux" → [{"id":"opt1","label":"Lyon"}, {"id":"opt2","label":"Nantes"}, {"id":"opt3","label":"Bordeaux"}]
 
-ÉTAPE 1 — GÉNÈRE MENTALEMENT TOUTES LES QUESTIONS CANDIDATES :
-Liste toutes les questions qui pourraient éclairer ce choix. Ne te censure pas encore.
+ÉTAPE 1 — GÉNÈRE DES QUESTIONS DEPUIS CES ANGLES PSYCHOLOGIQUES :
+Pour chaque angle, génère 1-2 questions candidates adaptées UNIQUEMENT à cette situation précise :
+→ Peur cachée : quelle peur non-dite oriente ce choix ? Qu'est-ce qui se passe vraiment si ça rate ?
+→ Contrainte imaginaire : quelle contrainte mentionnée est peut-être une excuse ou une croyance limitante ?
+→ Identité future : quel choix est plus cohérent avec qui cette personne veut vraiment devenir ?
+→ Permission : si personne autour ne savait ni ne jugeait, que choisirait-elle immédiatement ?
+→ Coût réel : qu'abandonne-t-on définitivement avec chaque option — pas juste les avantages de l'autre ?
+→ Signal énergétique : est-ce qu'une des options donne de l'élan ou de la fatigue rien qu'à y penser ?
+→ Factuel décisif : existe-t-il UNE donnée absente (chiffre, fait, condition) qui changerait tout l'arbitrage ?
+Ne génère pas une question par angle mécaniquement — saute les angles qui ne s'appliquent pas à ce contexte.
 
-ÉTAPE 2 — FILTRE DE PERTINENCE (applique dans cet ordre) :
-Pour chaque question candidate, élimine-la si :
-→ La réponse est déjà dans le texte fourni (RÈGLE N°0)
-→ C'est une question générique interdite (RÈGLE N°1)
+ÉTAPE 2 — FILTRE QUALITÉ (applique dans cet ordre) :
+Élimine une question si :
+→ La réponse est déjà dans le texte (RÈGLE N°0)
+→ C'est une question générique ou prévisible (RÈGLE N°1)
+→ Elle pourrait être posée à quelqu'un dans une situation différente (manque de spécificité)
 → Sa réponse ne changerait pas réellement l'analyse du choix
+Garde une question seulement si elle pourrait faire dire : "je n'avais pas pensé à ça".
 
 RÈGLE N°0 — FILTRE CONTENU :
 Avant de formuler chaque question, demande-toi : "Est-ce que la réponse est déjà dans le texte ?"
 Si oui → ne pose PAS cette question.
 
-RÈGLE N°1 — QUESTIONS INTERDITES (trop génériques) :
+RÈGLE N°1 — QUESTIONS INTERDITES (trop génériques ou prévisibles) :
 'Qu'est-ce qui compte le plus pour toi ?'
 'Quels sont tes objectifs ?'
 'Comment tu te sens par rapport à ce choix ?'
 'Quelles sont tes contraintes ?'
 'Qu'est-ce qui t'attire dans chaque option ?'
+'As-tu parlé de ça à des proches ?'
+'Depuis combien de temps tu y réfléchis ?'
+'As-tu déjà fait un choix similaire par le passé ?'
+Test à appliquer sur chaque question avant de la garder : "Est-ce que cette question pourrait surprendre la personne ?" Si non → élimine.
 
-ÉTAPE 3 — SÉLECTION DU NOMBRE OPTIMAL (entre 2 et 10) :
+RÈGLE CRÉATIVITÉ — EXEMPLES DE BONNES QUESTIONS (adapter au contexte, ne jamais copier-coller) :
+"Si la contrainte [X mentionnée dans le texte] disparaissait demain, que choisirais-tu immédiatement ?"
+"Qu'est-ce que tu n'as pas dit dans ta description de la situation ?"
+"Si tu avais pleine permission de choisir ce que tu veux vraiment, sans devoir le justifier à quiconque, que choisirais-tu ?"
+"Dans 10 ans, laquelle de ces options ressemblera à l'évidence ?"
+"Quand tu imagines [option X] concrètement, ton énergie monte ou descend ?"
+"Quelle est la vraie raison pour laquelle tu n'as pas encore tranché ?"
+"Laquelle de ces options choisirait la version de toi dans 5 ans ?"
+"Si tu pouvais observer quelqu'un qui a fait ce même choix il y a 10 ans, qu'est-ce que tu verrais aujourd'hui ?"
+
+ÉTAPE 3 — SÉLECTION DU NOMBRE OPTIMAL (entre 3 et 5) :
 Garde uniquement les questions indispensables — celles dont la réponse change réellement l'analyse.
 Le nombre final dépend exclusivement de la pertinence :
-- Contexte simple et univoque → 2 à 3 questions
-- Contexte standard → 4 à 6 questions
-- Contexte complexe, multi-enjeux ou chargé émotionnellement → 7 à 10 questions
+- Contexte simple et univoque → 3 questions
+- Contexte standard → 4 questions
+- Contexte complexe, multi-enjeux ou chargé émotionnellement → 5 questions
 Critère absolu : chaque question conservée doit être indispensable. Filtre sans pitié.
 
 RÈGLE N°2 — QUESTION INSTINCT OBLIGATOIRE :
@@ -164,10 +188,10 @@ L'une des questions DOIT être de type 'choice' avec comme options : les labels 
 Ex : 'Quand tu imagines ta journée dans 6 mois, laquelle des options te vient naturellement en premier ?'
 
 RÈGLE N°3 — ORDRE DE LA SÉRIE :
-- 1ère position : question factuelle (fait ou chiffre clé absent du texte)
-- Milieu : questions factuelles et émotionnelles selon le contexte
+- 1ère position : question d'ancrage — soit le factuel décisif absent du texte, soit la contrainte principale qui structure tout le reste
+- Milieu : questions qui déplacent le regard (parmi : peur cachée, contrainte imaginaire, identité future, permission, coût réel, signal énergétique)
 - Avant-dernière position : question instinct (type 'choice', voir règle N°2)
-- Dernière position : question inconfortable (celle que la personne préfère éviter)
+- Dernière position : question inconfortable (celle que la personne préfère éviter — souvent reliée à la peur cachée)
 Exception si N=2 : Q1=instinct, Q2=inconfortable.
 
 N'utilise PAS de guillemets autour des mots dans les questions.
@@ -185,7 +209,7 @@ FORMAT — JSON pur, sans markdown, sans backticks :
   "questions": [
     { "id": "q1", "question": "...", "type": "choice", "options": ["...", "..."] },
     { "id": "q2", "question": "...", "type": "slider", "min_label": "...", "max_label": "..." },
-    ...entre 2 et 10 questions selon pertinence...
+    ...entre 3 et 5 questions selon pertinence...
     { "id": "q[N-1]", "question": "Quand tu imagines...", "type": "choice", "options": ["[opt1.label]", "[opt2.label]", "Les options se valent"] },
     { "id": "q[N]", "question": "...", "type": "open" }
   ]
@@ -206,7 +230,7 @@ export async function callAppel1(originalText: string): Promise<{ data: Appel1Re
 ${originalText}
 ---
 ${ctxBlock}
-Analyse la richesse du contexte et génère entre 2 et 10 questions pertinentes sur cette situation. Choisis le nombre optimal selon la pertinence — ni plus, ni moins.`;
+Analyse la richesse du contexte et génère entre 3 et 5 questions pertinentes sur cette situation. Choisis le nombre optimal selon la pertinence — ni plus, ni moins.`;
 
   const { text, provider } = await callLLM(SYSTEM_APPEL_1, userMessage);
   return { data: parseResponse<Appel1Response>(text), provider };
@@ -227,6 +251,8 @@ Si texte cite '3k€ de MRR' → 'MRR validé vs CDI stable'
 Si texte cite 'crédit 900€' → 'Charges fixes 900€/mois'
 
 SCORES : Chaque option doit avoir un score différencié (1-10). Interdit d'attribuer le même score à toutes les options sur un critère. Justifie chaque score par les infos données.
+
+TRAITEMENT DES RÉPONSES : Les réponses aux questions sont des signaux — extrais leur substance, ne les cite jamais mot pour mot. Si une formulation contient des fautes ou est maladroite, reformule proprement. N'intègre jamais le texte d'une question dans un label ou une description.
 
 FORMAT — JSON pur sans markdown :
 {
@@ -283,7 +309,7 @@ Génère 5 critères nommés depuis des éléments précis du texte. Pour chaque
 const SYSTEM_APPEL_3 = `Tu es psychologue spécialisé en prise de décision. Produis une analyse directe, honnête, non complaisante.
 
 RÈGLES :
-1. Cite des éléments SPÉCIFIQUES du texte dans chaque section (chiffres, formulations exactes, personnes nommées)
+1. Cite des éléments SPÉCIFIQUES de la situation (chiffres, faits, personnes nommées) — jamais mot pour mot une question ou une réponse des échanges précédents. Extrais leur substance et reformule proprement, même si les formulations originales contiennent des fautes.
 2. Les biais : nomme comment ils se manifestent PRÉCISÉMENT ici
 3. Le blindspot : quelque chose que la personne n'a PAS dit mais devrait regarder en face
 4. La deciding_question : la plus inconfortable, basée sur l'élément le plus sensible du texte
