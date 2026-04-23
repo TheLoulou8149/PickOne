@@ -82,7 +82,7 @@ export async function getUserContextBlock(): Promise<string> {
   if (!user) return '';
   const { data } = await supabase
     .from('user_context')
-    .select('age, situation_pro, situation_perso, valeurs, style_risque, contexte_libre')
+    .select('age, situation_pro, situation_perso, valeurs, style_risque, contexte_libre, score_franchise, score_familiarite')
     .eq('user_id', user.id)
     .maybeSingle();
   if (!data) return '';
@@ -95,8 +95,30 @@ export async function getUserContextBlock(): Promise<string> {
   if (data.style_risque) lines.push(`- Rapport au risque : ${data.style_risque}`);
   if (data.contexte_libre) lines.push(`- Contexte libre : ${data.contexte_libre}`);
 
-  if (lines.length === 0) return '';
-  return `\n\nPROFIL DE L'UTILISATEUR (à prendre en compte discrètement, sans le citer explicitement) :\n${lines.join('\n')}`;
+  const profileBlock = lines.length > 0
+    ? `\n\nPROFIL DE L'UTILISATEUR (à prendre en compte discrètement, sans le citer explicitement) :\n${lines.join('\n')}`
+    : '';
+
+  const f: number = data.score_franchise ?? 3;
+  const fam: number = data.score_familiarite ?? 3;
+
+  const franchiseInstruction =
+    f === 1 ? "Sois bienveillant et encourageant. Formule les vérités difficiles avec douceur et empathie." :
+    f === 2 ? "Sois direct mais nuancé. N'édulcore pas, mais reste constructif et ménagé dans tes formulations." :
+    f === 3 ? "Sois direct et honnête. Pas de bienveillance excessive." :
+    f === 4 ? "Sois cash et sans filtre. N'édulcore rien. Dis les vérités difficiles crûment." :
+              "Sois brutal et sans aucun ménagement. Vérités crues, directement. Aucune précaution de langage.";
+
+  const familiariteInstruction =
+    fam === 1 ? "Vouvoie l'utilisateur. Adopte un registre professionnel et soutenu." :
+    fam === 2 ? "Tutoie l'utilisateur. Reste poli et courtois dans les formulations." :
+    fam === 3 ? "Tutoie naturellement. Registre neutre, ni trop formel ni trop familier." :
+    fam === 4 ? "Tutoie avec familiarité. Utilise un langage courant et décontracté." :
+                "Tutoie très familièrement. Langage décontracté, argot si pertinent.";
+
+  const toneBlock = `\n\nCONSIGNE DE TON (à respecter impérativement dans toutes tes formulations) :\n- Franchise : ${franchiseInstruction}\n- Registre : ${familiariteInstruction}`;
+
+  return `${profileBlock}${toneBlock}`;
 }
 
 // ─── APPEL 1 — Questions personnalisées ───────────────────────────────────────

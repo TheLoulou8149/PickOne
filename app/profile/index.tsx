@@ -168,8 +168,88 @@ const CONTEXT_FIELDS = [
   { key: 'contexte_libre', label: 'Infos complémentaires', placeholder: 'Tout ce qui peut être utile à l\'IA…', hint: 'Contraintes, projets, situations particulières.', multiline: true },
 ];
 
+const FRANCHISE_LEVELS = [
+  { score: 1, label: 'Doux' },
+  { score: 2, label: 'Nuancé' },
+  { score: 3, label: 'Direct' },
+  { score: 4, label: 'Cash' },
+  { score: 5, label: 'Brutal' },
+];
+
+const FAMILIARITE_LEVELS = [
+  { score: 1, label: 'Formel' },
+  { score: 2, label: 'Poli' },
+  { score: 3, label: 'Naturel' },
+  { score: 4, label: 'Familier' },
+  { score: 5, label: 'Pote' },
+];
+
+function ToneSelector({
+  label,
+  hint,
+  levels,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  levels: { score: number; label: string }[];
+  value: number;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <View style={toneStyles.wrap}>
+      <Text style={tabStyles.fieldLabel}>{label}</Text>
+      <Text style={tabStyles.fieldHint}>{hint}</Text>
+      <View style={toneStyles.row}>
+        {levels.map((l) => {
+          const active = value === l.score;
+          return (
+            <TouchableOpacity
+              key={l.score}
+              style={[toneStyles.tile, active && toneStyles.tileActive]}
+              onPress={() => onChange(l.score)}
+              activeOpacity={0.7}
+            >
+              <Text style={[toneStyles.tileLabel, active && toneStyles.tileLabelActive]}>
+                {l.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const toneStyles = StyleSheet.create({
+  wrap: { gap: 4 },
+  row: { flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.xs },
+  tile: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.surfaceGray,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+  },
+  tileActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  tileLabel: {
+    fontSize: Typography.fontSizeXS,
+    fontWeight: Typography.fontWeightSemiBold,
+    color: Colors.textMuted,
+  },
+  tileLabelActive: { color: '#fff' },
+});
+
 function TabContexte() {
   const [fields, setFields] = useState<Record<string, string>>({});
+  const [scoreFranchise, setScoreFranchise] = useState(3);
+  const [scoreFamiliarite, setScoreFamiliarite] = useState(3);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -182,7 +262,11 @@ function TabContexte() {
         .select('*')
         .eq('user_id', user.id)
         .single();
-      if (data) setFields(data);
+      if (data) {
+        setFields(data);
+        if (data.score_franchise != null) setScoreFranchise(data.score_franchise);
+        if (data.score_familiarite != null) setScoreFamiliarite(data.score_familiarite);
+      }
       setLoading(false);
     });
   }, []);
@@ -196,6 +280,8 @@ function TabContexte() {
     await supabase.from('user_context').upsert({
       user_id: user.id,
       ...fields,
+      score_franchise: scoreFranchise,
+      score_familiarite: scoreFamiliarite,
     }, { onConflict: 'user_id' });
 
     setSaving(false);
@@ -210,6 +296,31 @@ function TabContexte() {
       <Text style={tabStyles.contextIntro}>
         Ces informations sont injectées discrètement dans chaque analyse pour la rendre plus précise et personnalisée. Tu peux les modifier à tout moment.
       </Text>
+
+      {/* Ton de l'IA */}
+      <View style={tabStyles.infoCard}>
+        <Text style={toneCardStyles.cardTitle}>Ton de l'IA</Text>
+        <Text style={toneCardStyles.cardSubtitle}>
+          Personnalise comment l'IA s'adresse à toi.
+        </Text>
+        <ToneSelector
+          label="Franchise"
+          hint="Jusqu'où tu veux que l'IA soit directe ?"
+          levels={FRANCHISE_LEVELS}
+          value={scoreFranchise}
+          onChange={setScoreFranchise}
+        />
+        <View style={{ height: Spacing.md }} />
+        <ToneSelector
+          label="Familiarité"
+          hint="Quel registre de langage tu préfères ?"
+          levels={FAMILIARITE_LEVELS}
+          value={scoreFamiliarite}
+          onChange={setScoreFamiliarite}
+        />
+      </View>
+
+      {/* Contexte profil */}
       <View style={tabStyles.infoCard}>
         {CONTEXT_FIELDS.map((f, i) => (
           <View key={f.key} style={i > 0 ? { marginTop: Spacing.md } : undefined}>
@@ -246,6 +357,20 @@ function TabContexte() {
     </View>
   );
 }
+
+const toneCardStyles = StyleSheet.create({
+  cardTitle: {
+    fontSize: Typography.fontSizeSM,
+    fontWeight: Typography.fontWeightBold,
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  cardSubtitle: {
+    fontSize: Typography.fontSizeXS,
+    color: Colors.textMuted,
+    marginBottom: Spacing.md,
+  },
+});
 
 // ─── Onglet Profil Cognitif ───────────────────────────────────────────────────
 

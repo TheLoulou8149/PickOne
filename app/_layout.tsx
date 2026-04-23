@@ -6,6 +6,7 @@ import { Platform, View, ActivityIndicator } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
+import { ToneSetupModal } from '@/components/ToneSetupModal';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,6 +15,7 @@ const isWeb = Platform.OS === 'web';
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [showToneModal, setShowToneModal] = useState(false);
   const router = useRouter();
   const segments = useSegments();
 
@@ -44,6 +46,21 @@ export default function RootLayout() {
     }
   }, [session, initialized, segments]);
 
+  // Détecte la première connexion : score_franchise null = jamais configuré
+  useEffect(() => {
+    if (!initialized || !session || !session.user.email_confirmed_at) return;
+    supabase
+      .from('user_context')
+      .select('score_franchise')
+      .eq('user_id', session.user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data || data.score_franchise === null || data.score_franchise === undefined) {
+          setShowToneModal(true);
+        }
+      });
+  }, [initialized, session]);
+
   if (!initialized) {
     return (
       <View style={{ flex: 1, backgroundColor: Colors.background, justifyContent: 'center', alignItems: 'center' }}>
@@ -55,6 +72,7 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="light" />
+      <ToneSetupModal visible={showToneModal} onDone={() => setShowToneModal(false)} />
       <Stack
         screenOptions={{
           headerShown: false,
