@@ -34,9 +34,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (!initialized) return;
     const inAuthGroup = segments[0] === 'auth';
+    const emailConfirmed = session?.user?.email_confirmed_at != null;
     if (!session && !inAuthGroup) {
       router.replace('/auth' as any);
-    } else if (session && inAuthGroup) {
+    } else if (session && !emailConfirmed) {
+      supabase.auth.signOut();
+    } else if (session && emailConfirmed && inAuthGroup) {
       router.replace('/' as any);
     }
   }, [session, initialized, segments]);

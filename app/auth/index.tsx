@@ -21,22 +21,47 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
 
   async function handleSubmit() {
     if (!email.trim() || !password.trim()) return;
     setError('');
     setSuccess('');
+    setNeedsConfirmation(false);
     setLoading(true);
 
     if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (error) setError(error.message);
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (error) {
+        if (error.message.toLowerCase().includes('email not confirmed')) {
+          setError('Tu dois d\'abord confirmer ton email. Vérifie ta boîte mail (et les spams).');
+          setNeedsConfirmation(true);
+        } else {
+          setError(error.message);
+        }
+      } else if (data.user && !data.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        setError('Tu dois d\'abord confirmer ton email. Vérifie ta boîte mail (et les spams).');
+        setNeedsConfirmation(true);
+      }
     } else {
       const { error } = await supabase.auth.signUp({ email: email.trim(), password });
       if (error) setError(error.message);
-      else setSuccess('Compte créé ! Vérifie ton email pour confirmer, puis connecte-toi.');
+      else {
+        setSuccess('Compte créé ! Vérifie ton email pour confirmer, puis connecte-toi.');
+        setNeedsConfirmation(true);
+      }
     }
 
+    setLoading(false);
+  }
+
+  async function handleResend() {
+    if (!email.trim()) { setError('Entre ton email d\'abord.'); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    if (error) setError(error.message);
+    else setSuccess('Email de confirmation renvoyé !');
     setLoading(false);
   }
 
@@ -85,6 +110,12 @@ export default function AuthScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {success ? <Text style={styles.successText}>{success}</Text> : null}
+
+          {needsConfirmation && (
+            <Pressable onPress={handleResend} disabled={loading}>
+              <Text style={styles.resendText}>Renvoyer l'email de confirmation</Text>
+            </Pressable>
+          )}
 
           <Pressable
             style={({ pressed }) => [styles.button, (loading || pressed) && styles.buttonDim]}
@@ -144,4 +175,5 @@ const styles = StyleSheet.create({
   buttonDim: { opacity: 0.45 },
   buttonText: { color: '#fff', fontSize: Typography.fontSizeLG, fontWeight: Typography.fontWeightBold },
   toggle: { textAlign: 'center', color: Colors.primary, fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightSemiBold },
+  resendText: { textAlign: 'center', color: Colors.primary, fontSize: Typography.fontSizeSM, textDecorationLine: 'underline' },
 });

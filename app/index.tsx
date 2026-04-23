@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Modal,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -246,17 +245,7 @@ export default function HomeScreen() {
         {/* Feedback */}
         <TouchableOpacity
           style={styles.feedbackLink}
-          onPress={() => {
-            if (Platform.OS !== 'web') {
-              Alert.alert(
-                'Non disponible sur mobile',
-                'Envoie tes retours depuis la version navigateur de PickOne.',
-                [{ text: 'OK' }]
-              );
-              return;
-            }
-            setShowFeedback(true);
-          }}
+          onPress={() => setShowFeedback(true)}
         >
           <Text style={styles.feedbackLinkText}>Bug ou suggestion ? Dis-nous →</Text>
         </TouchableOpacity>

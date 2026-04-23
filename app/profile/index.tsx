@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -715,17 +714,7 @@ export default function ProfileScreen() {
         {/* Feedback */}
         <TouchableOpacity
           style={styles.feedbackBtn}
-          onPress={() => {
-            if (Platform.OS !== 'web') {
-              Alert.alert(
-                'Non disponible sur mobile',
-                'Envoie tes retours depuis la version navigateur de PickOne.',
-                [{ text: 'OK' }]
-              );
-              return;
-            }
-            setShowFeedback(true);
-          }}
+          onPress={() => setShowFeedback(true)}
           activeOpacity={0.75}
         >
           <MessageSquare size={15} color={Colors.textMuted} strokeWidth={1.5} />
