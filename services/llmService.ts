@@ -56,10 +56,14 @@ async function callLLM(
   attempt = 0
 ): Promise<{ text: string; provider: 'gemini' | 'anthropic' }> {
   try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = {};
+    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+
     const response = await axios.post(
       `${BACKEND_URL}/api/llm`,
       { systemPrompt, userMessage },
-      { timeout: TIMEOUT }
+      { timeout: TIMEOUT, headers }
     );
     return { text: response.data.text, provider: response.data.provider };
   } catch (err: any) {

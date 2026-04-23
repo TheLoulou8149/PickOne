@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.use(cors());
@@ -8,6 +10,37 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+
+// ─── Auth middleware ──────────────────────────────────────────────────────────
+
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Non autorisé' });
+  }
+  const token = authHeader.slice(7);
+  const secret = process.env.SUPABASE_JWT_SECRET;
+  if (!secret) return res.status(500).json({ error: 'JWT secret non configuré' });
+  try {
+    const payload = jwt.verify(token, secret);
+    req.userId = payload.sub;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Token invalide ou expiré' });
+  }
+}
+
+// ─── Rate limiting : 30 appels LLM / heure / utilisateur ─────────────────────
+// 30 appels = ~10 décisions complètes par heure par user
+
+const llmLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => req.userId ?? req.ip,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Limite atteinte, réessaie dans une heure.' },
+});
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 
@@ -17,7 +50,7 @@ app.get('/', (req, res) => {
 
 // ─── POST /api/llm ─────────────────────────────────────────────────────────────
 
-app.post('/api/llm', async (req, res) => {
+app.post('/api/llm', requireAuth, llmLimiter, async (req, res) => {
   try {
     const { systemPrompt, userMessage } = req.body;
     if (!systemPrompt || !userMessage) {
