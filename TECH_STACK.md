@@ -159,4 +159,4 @@ Le fournisseur actif est sélectionné via variable d'environnement `LLM_PROVIDE
 | `GEMINI_API_KEY` | Clé API Google Gemini |
 | `RESEND_API_KEY` | Clé API Resend (emails) |
 | `EXPO_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Clé publique Supabase |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Clé publique Supabase
