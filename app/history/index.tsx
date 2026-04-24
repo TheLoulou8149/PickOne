@@ -207,30 +207,43 @@ function DecisionCard({
   );
 }
 
+const PAGE_SIZE = 20;
+
 export default function HistoryScreen() {
   const router = useRouter();
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
   const [email, setEmail] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [showSort, setShowSort] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selecting, setSelecting] = useState(false);
 
-  async function fetchDecisions() {
-    const { data, error } = await supabase
+  async function fetchDecisions(reset = false) {
+    const currentOffset = reset ? 0 : offset;
+    const { data, error, count } = await supabase
       .from('decisions')
-      .select('id, created_at, context_summary, option_a, option_b, winner, score_a, score_b, niveau_reco, label_niveau, message_coherence, weights, analysis, criteria, answers')
-      .order('created_at', { ascending: false });
+      .select('id, created_at, context_summary, option_a, option_b, winner, score_a, score_b, niveau_reco, label_niveau, message_coherence, weights, analysis, criteria, answers', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(currentOffset, currentOffset + PAGE_SIZE - 1);
 
-    if (!error && data) setDecisions(data as Decision[]);
+    if (!error && data) {
+      setDecisions(reset ? (data as Decision[]) : (prev) => [...prev, ...(data as Decision[])]);
+      const newOffset = currentOffset + data.length;
+      setOffset(newOffset);
+      setHasMore((count ?? 0) > newOffset);
+    }
     setLoading(false);
     setRefreshing(false);
+    setLoadingMore(false);
   }
 
   useEffect(() => {
-    fetchDecisions();
+    fetchDecisions(true);
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user?.email) setEmail(user.email);
     });
@@ -238,8 +251,13 @@ export default function HistoryScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchDecisions();
+    fetchDecisions(true);
   }, []);
+
+  function loadMore() {
+    setLoadingMore(true);
+    fetchDecisions(false);
+  }
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -341,7 +359,9 @@ export default function HistoryScreen() {
         >
           {/* Barre infos + actions */}
           <View style={styles.toolbar}>
-            <Text style={styles.count}>{decisions.length} décision{decisions.length > 1 ? 's' : ''}</Text>
+            <Text style={styles.count}>
+              {decisions.length} décision{decisions.length > 1 ? 's' : ''}{hasMore ? ' chargées' : ''}
+            </Text>
             {!selecting && (
               <TouchableOpacity onPress={deleteAll}>
                 <Text style={styles.deleteAllText}>Tout supprimer</Text>
@@ -360,6 +380,14 @@ export default function HistoryScreen() {
               onToggle={() => toggleSelect(d.id)}
             />
           ))}
+
+          {hasMore && (
+            <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore} disabled={loadingMore}>
+              {loadingMore
+                ? <ActivityIndicator color={Colors.primary} size="small" />
+                : <Text style={styles.loadMoreText}>Charger plus</Text>}
+            </TouchableOpacity>
+          )}
         </ScrollView>
       )}
 
@@ -429,4 +457,10 @@ const styles = StyleSheet.create({
   niveauText: { fontSize: Typography.fontSizeXS, fontWeight: Typography.fontWeightSemiBold },
   footerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   date: { fontSize: Typography.fontSizeXS, color: Colors.textMuted },
+  loadMoreBtn: {
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: Spacing.md, borderRadius: BorderRadius.md,
+    borderWidth: 1, borderColor: Colors.border, marginTop: Spacing.xs,
+  },
+  loadMoreText: { fontSize: Typography.fontSizeSM, color: Colors.primary, fontWeight: Typography.fontWeightSemiBold },
 });
