@@ -10,7 +10,7 @@ import { ToneSetupModal } from '@/components/ToneSetupModal';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
-  dsn: 'https://f410ec99f81d0a235e5ccccc8302eab1@o4511275280760832.ingest.de.sentry.io/4511275297538128',
+  dsn: 'https://c17d179ee8561e7733ee5db90cbcbe23@o4511275280760832.ingest.de.sentry.io/4511275309596752',
   enabled: !__DEV__,
   tracesSampleRate: 0.2,
 });
