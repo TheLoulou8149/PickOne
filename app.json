@@ -51,7 +51,8 @@
           "microphonePermission": "PickOne utilise le micro pour retranscrire ton dilemme à l'oral.",
           "speechRecognitionPermission": "PickOne utilise la reconnaissance vocale pour saisir ton dilemme."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
