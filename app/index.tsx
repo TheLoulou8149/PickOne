@@ -9,7 +9,6 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableOpacity,
-  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -33,7 +32,6 @@ export default function HomeScreen() {
   const [error, setError] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
-  const [showBetaBanner, setShowBetaBanner] = useState(true);
   const [showFeedback, setShowFeedback] = useState(false);
 
   const canStart = text.trim().length > 20;
@@ -121,35 +119,6 @@ export default function HomeScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Popup bêta */}
-      <Modal
-        visible={showBetaBanner}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowBetaBanner(false)}
-      >
-        <View style={betaStyles.overlay}>
-          <View style={betaStyles.sheet}>
-            <View style={betaStyles.badgeRow}>
-              <View style={betaStyles.badge}>
-                <Text style={betaStyles.badgeText}>BÊTA</Text>
-              </View>
-            </View>
-            <Text style={betaStyles.title}>Application en cours de développement</Text>
-            <Text style={betaStyles.body}>
-              PickOne est encore en version bêta. Tu peux rencontrer des bugs ou des comportements inattendus.{'\n\n'}Si une analyse échoue ou semble bloquée, <Text style={betaStyles.bold}>n'hésite pas à réappuyer sur le bouton</Text> — ça suffit généralement à relancer.{'\n\n'}Merci pour ta patience et tes retours !
-            </Text>
-            <TouchableOpacity
-              style={betaStyles.btn}
-              onPress={() => setShowBetaBanner(false)}
-              activeOpacity={0.85}
-            >
-              <Text style={betaStyles.btnText}>Compris, on y va →</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -421,65 +390,3 @@ const styles = StyleSheet.create({
   },
 });
 
-const betaStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: '#00000060',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: Spacing.lg,
-    paddingBottom: 40,
-    gap: Spacing.md,
-  },
-  badgeRow: {
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  badge: {
-    backgroundColor: Colors.primaryPale,
-    borderRadius: BorderRadius.full,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: Colors.primary + '40',
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700' as const,
-    color: Colors.primary,
-    letterSpacing: 1.5,
-  },
-  title: {
-    fontSize: Typography.fontSizeLG,
-    fontWeight: '700' as const,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    letterSpacing: -0.3,
-  },
-  body: {
-    fontSize: Typography.fontSizeSM,
-    color: Colors.textSecondary,
-    lineHeight: 21,
-    textAlign: 'center',
-  },
-  bold: {
-    fontWeight: '700' as const,
-    color: Colors.textPrimary,
-  },
-  btn: {
-    backgroundColor: Colors.primary,
-    borderRadius: BorderRadius.md,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  btnText: {
-    color: '#fff',
-    fontSize: Typography.fontSizeMD,
-    fontWeight: '700' as const,
-  },
-});
