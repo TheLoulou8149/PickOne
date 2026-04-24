@@ -7,12 +7,19 @@ import { Colors } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { ToneSetupModal } from '@/components/ToneSetupModal';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+  dsn: 'https://f410ec99f81d0a235e5ccccc8302eab1@o4511275280760832.ingest.de.sentry.io/4511275297538128',
+  enabled: !__DEV__,
+  tracesSampleRate: 0.2,
+});
 
 SplashScreen.preventAutoHideAsync();
 
 const isWeb = Platform.OS === 'web';
 
-export default function RootLayout() {
+function RootLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [initialized, setInitialized] = useState(false);
   const [showToneModal, setShowToneModal] = useState(false);
@@ -28,6 +35,11 @@ export default function RootLayout() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setSession(session);
+      if (session?.user) {
+        Sentry.setUser({ id: session.user.id });
+      } else {
+        Sentry.setUser(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -94,3 +106,5 @@ export default function RootLayout() {
     </>
   );
 }
+
+export default Sentry.wrap(RootLayout);

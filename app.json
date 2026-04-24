@@ -52,7 +52,8 @@
           "speechRecognitionPermission": "PickOne utilise la reconnaissance vocale pour saisir ton dilemme."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true
