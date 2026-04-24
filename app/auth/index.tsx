@@ -8,6 +8,7 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useState } from 'react';
 import { Zap } from 'lucide-react-native';
@@ -138,6 +139,15 @@ export default function AuthScreen() {
           </Text>
         </Pressable>
 
+        {mode === 'signup' && (
+          <Pressable onPress={() => Linking.openURL('https://pickone-aamp.onrender.com/privacy')}>
+            <Text style={styles.privacyLink}>
+              En créant un compte, tu acceptes notre{' '}
+              <Text style={styles.privacyLinkUnderline}>politique de confidentialité</Text>
+            </Text>
+          </Pressable>
+        )}
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -176,4 +186,6 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontSize: Typography.fontSizeLG, fontWeight: Typography.fontWeightBold },
   toggle: { textAlign: 'center', color: Colors.primary, fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightSemiBold },
   resendText: { textAlign: 'center', color: Colors.primary, fontSize: Typography.fontSizeSM, textDecorationLine: 'underline' },
+  privacyLink: { textAlign: 'center', color: Colors.textMuted, fontSize: Typography.fontSizeXS, marginTop: Spacing.md },
+  privacyLinkUnderline: { textDecorationLine: 'underline', color: Colors.textMuted },
 });

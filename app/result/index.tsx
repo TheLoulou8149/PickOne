@@ -634,9 +634,8 @@ export default function ResultScreen() {
         answers: store.answers,
       });
       if (error) {
-        console.error('[PickOne] Erreur sauvegarde décision:', error.message, error.code);
+        if (__DEV__) console.error('[PickOne] Erreur sauvegarde décision:', error.message, error.code);
       } else {
-        console.log('[PickOne] Décision sauvegardée ✓');
         const { data: stats } = await supabase
           .from('user_stats')
           .select('total_decisions')
@@ -646,8 +645,7 @@ export default function ResultScreen() {
           { user_id: user.id, total_decisions: (stats?.total_decisions ?? 0) + 1 },
           { onConflict: 'user_id' }
         );
-        if (statsErr) console.error('[PickOne] Erreur stats:', statsErr.message);
-        else console.log('[PickOne] total_decisions:', (stats?.total_decisions ?? 0) + 1);
+        if (statsErr && __DEV__) console.error('[PickOne] Erreur stats:', statsErr.message);
       }
     });
   }, [analysis]);

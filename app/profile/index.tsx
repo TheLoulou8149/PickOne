@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
@@ -71,6 +72,10 @@ function TabCompte() {
 
       <TouchableOpacity style={tabStyles.dangerBtn} onPress={handleLogout}>
         <Text style={tabStyles.dangerBtnText}>Se déconnecter</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => Linking.openURL('https://pickone-aamp.onrender.com/privacy')}>
+        <Text style={tabStyles.privacyLink}>Politique de confidentialité</Text>
       </TouchableOpacity>
     </View>
   );
@@ -788,6 +793,7 @@ const tabStyles = StyleSheet.create({
   error: { color: Colors.danger, fontSize: Typography.fontSizeSM },
   successRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   successText: { color: Colors.success, fontSize: Typography.fontSizeSM, fontWeight: Typography.fontWeightSemiBold },
+  privacyLink: { textAlign: 'center', color: Colors.textMuted, fontSize: Typography.fontSizeXS, textDecorationLine: 'underline', marginTop: Spacing.xs },
 });
 
 // ─── Écran principal ──────────────────────────────────────────────────────────
