@@ -31,7 +31,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+const GEMINI_MODEL = 'gemini-2.0-flash';
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 
@@ -115,7 +115,7 @@ app.get('/privacy', (req, res) => {
 <p class="updated">Dernière mise à jour : ${new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
 <h2>1. Qui sommes-nous ?</h2>
-<p>PickOne est une application mobile développée par <strong>Louis Frerejean</strong>, développeur indépendant. Elle aide les utilisateurs à prendre des décisions grâce à une analyse assistée par intelligence artificielle.</p>
+<p>PickOne est une application mobile co-créée par <strong>Morgane Fromenteau</strong> (conception du processus décisionnel) et <strong>Louis Frerejean</strong> (développement technique). Elle aide les utilisateurs à prendre des décisions grâce à une analyse assistée par intelligence artificielle.</p>
 <p>Contact : <a href="mailto:l.frerejean05@gmail.com">l.frerejean05@gmail.com</a></p>
 
 <h2>2. Données collectées</h2>

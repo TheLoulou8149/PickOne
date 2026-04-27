@@ -9,9 +9,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
+  TouchableOpacity,
 } from 'react-native';
 import { useState } from 'react';
-import { Zap } from 'lucide-react-native';
+import { Zap, Eye, EyeOff } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 
@@ -19,6 +20,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -99,15 +101,20 @@ export default function AuthScreen() {
             autoComplete="email"
           />
 
-          <TextInput
-            style={styles.input}
-            placeholder="Mot de passe"
-            placeholderTextColor={Colors.textMuted}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-          />
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={[styles.input, styles.passwordInput]}
+              placeholder="Mot de passe"
+              placeholderTextColor={Colors.textMuted}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+            />
+            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(v => !v)}>
+              {showPassword ? <EyeOff size={18} color={Colors.textMuted} /> : <Eye size={18} color={Colors.textMuted} />}
+            </TouchableOpacity>
+          </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
           {success ? <Text style={styles.successText}>{success}</Text> : null}
@@ -176,6 +183,9 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md, color: Colors.textPrimary,
     fontSize: Typography.fontSizeMD, paddingHorizontal: Spacing.md, paddingVertical: Spacing.md,
   },
+  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  passwordInput: { flex: 1, paddingRight: 44 },
+  eyeBtn: { position: 'absolute', right: 0, paddingHorizontal: 14, paddingVertical: Spacing.md },
   error: { color: Colors.danger, fontSize: Typography.fontSizeSM },
   successText: { color: Colors.success, fontSize: Typography.fontSizeSM, lineHeight: Typography.fontSizeSM * 1.6 },
   button: {

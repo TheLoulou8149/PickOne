@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, User, Lock, Brain, Check, MessageSquare, TrendingUp, Sparkles } from 'lucide-react-native';
+import { ArrowLeft, User, Lock, Brain, Check, MessageSquare, TrendingUp, Sparkles, Eye, EyeOff } from 'lucide-react-native';
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { supabase } from '@/lib/supabase';
 import { FeedbackModal } from '@/components/FeedbackModal';
@@ -90,6 +90,9 @@ function TabPassword() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   async function handleChange() {
     setError('');
@@ -115,32 +118,47 @@ function TabPassword() {
     <View style={tabStyles.container}>
       <View style={tabStyles.infoCard}>
         <Text style={tabStyles.fieldLabel}>Mot de passe actuel</Text>
-        <TextInput
-          style={tabStyles.input}
-          secureTextEntry
-          value={current}
-          onChangeText={setCurrent}
-          placeholder="••••••••"
-          placeholderTextColor={Colors.textMuted}
-        />
+        <View style={tabStyles.passwordRow}>
+          <TextInput
+            style={[tabStyles.input, tabStyles.passwordInput]}
+            secureTextEntry={!showCurrent}
+            value={current}
+            onChangeText={setCurrent}
+            placeholder="••••••••"
+            placeholderTextColor={Colors.textMuted}
+          />
+          <TouchableOpacity style={tabStyles.eyeBtn} onPress={() => setShowCurrent(v => !v)}>
+            {showCurrent ? <EyeOff size={16} color={Colors.textMuted} /> : <Eye size={16} color={Colors.textMuted} />}
+          </TouchableOpacity>
+        </View>
         <Text style={[tabStyles.fieldLabel, { marginTop: Spacing.md }]}>Nouveau mot de passe</Text>
-        <TextInput
-          style={tabStyles.input}
-          secureTextEntry
-          value={next}
-          onChangeText={setNext}
-          placeholder="••••••••"
-          placeholderTextColor={Colors.textMuted}
-        />
+        <View style={tabStyles.passwordRow}>
+          <TextInput
+            style={[tabStyles.input, tabStyles.passwordInput]}
+            secureTextEntry={!showNext}
+            value={next}
+            onChangeText={setNext}
+            placeholder="••••••••"
+            placeholderTextColor={Colors.textMuted}
+          />
+          <TouchableOpacity style={tabStyles.eyeBtn} onPress={() => setShowNext(v => !v)}>
+            {showNext ? <EyeOff size={16} color={Colors.textMuted} /> : <Eye size={16} color={Colors.textMuted} />}
+          </TouchableOpacity>
+        </View>
         <Text style={[tabStyles.fieldLabel, { marginTop: Spacing.md }]}>Confirmer</Text>
-        <TextInput
-          style={tabStyles.input}
-          secureTextEntry
-          value={confirm}
-          onChangeText={setConfirm}
-          placeholder="••••••••"
-          placeholderTextColor={Colors.textMuted}
-        />
+        <View style={tabStyles.passwordRow}>
+          <TextInput
+            style={[tabStyles.input, tabStyles.passwordInput]}
+            secureTextEntry={!showConfirm}
+            value={confirm}
+            onChangeText={setConfirm}
+            placeholder="••••••••"
+            placeholderTextColor={Colors.textMuted}
+          />
+          <TouchableOpacity style={tabStyles.eyeBtn} onPress={() => setShowConfirm(v => !v)}>
+            {showConfirm ? <EyeOff size={16} color={Colors.textMuted} /> : <Eye size={16} color={Colors.textMuted} />}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {error ? <Text style={tabStyles.error}>{error}</Text> : null}
@@ -775,6 +793,9 @@ const tabStyles = StyleSheet.create({
     borderRadius: BorderRadius.sm, color: Colors.textPrimary,
     fontSize: Typography.fontSizeSM, paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
   },
+  passwordRow: { flexDirection: 'row', alignItems: 'center' },
+  passwordInput: { flex: 1, paddingRight: 40 },
+  eyeBtn: { position: 'absolute', right: 0, paddingHorizontal: 12, paddingVertical: Spacing.sm },
   contextIntro: {
     fontSize: Typography.fontSizeSM, color: Colors.textMuted,
     lineHeight: Typography.fontSizeSM * 1.6,
