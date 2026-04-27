@@ -31,7 +31,7 @@ app.use((req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-2.5-flash-lite';
 
 // ─── Auth middleware ──────────────────────────────────────────────────────────
 
