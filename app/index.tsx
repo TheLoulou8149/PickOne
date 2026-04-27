@@ -22,6 +22,7 @@ import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel1 } from '@/services/llmService';
 import { MicButton } from '@/components/MicButton';
 import { FeedbackModal } from '@/components/FeedbackModal';
+import { useInterstitialAd } from '@/hooks/useInterstitialAd';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function HomeScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
   const [showFeedback, setShowFeedback] = useState(false);
+  const { showAd } = useInterstitialAd();
 
   const canStart = text.trim().length > 20;
 
@@ -96,7 +98,10 @@ export default function HomeScreen() {
     reset();
     setIsLoading(true);
     try {
-      const { data: result, provider } = await callAppel1(text.trim());
+      const [{ data: result, provider }] = await Promise.all([
+        callAppel1(text.trim()),
+        showAd(),
+      ]);
       setAppel1Result({
         originalText: text.trim(),
         options: result.options,

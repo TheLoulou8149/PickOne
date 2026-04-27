@@ -6,6 +6,7 @@ import {
   TextInput,
   ActivityIndicator,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -17,6 +18,7 @@ import {
 import { Colors, Typography, Spacing, BorderRadius } from '@/constants/theme';
 import { useDecisionStore } from '@/store/decisionStore';
 import { callAppel2, callAppel3 } from '@/services/llmService';
+import { useInterstitialAd } from '@/hooks/useInterstitialAd';
 import { AiBadge } from '@/components/AiBadge';
 import { MicButton } from '@/components/MicButton';
 import type { Question } from '@/store/decisionStore';
@@ -195,10 +197,12 @@ export default function QuestionsScreen() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [localAnswers, setLocalAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
   const [error, setError] = useState('');
 
   const [isRecording, setIsRecording] = useState(false);
   const [interimText, setInterimText] = useState('');
+  const { showAd } = useInterstitialAd();
 
   const questions = store.questions;
   const total = questions.length;
@@ -282,62 +286,73 @@ export default function QuestionsScreen() {
       }
       const allAnswers = { ...store.answers, ...localAnswers };
 
-      // Appel 2 — critères
-      const { data: result2, provider: p2 } = await callAppel2({
-        originalText: store.originalText,
-        options: store.options,
-        questions: store.questions,
-        answers: allAnswers,
-      });
-      store.setAppel2Result(result2.criteria);
-      store.setAiProvider('appel2', p2);
+      // Lance la pub et l'IA en parallèle
+      let aiDone = false;
+      const aiPromise = (async () => {
+        // Appel 2 — critères
+        const { data: result2, provider: p2 } = await callAppel2({
+          originalText: store.originalText,
+          options: store.options,
+          questions: store.questions,
+          answers: allAnswers,
+        });
+        store.setAppel2Result(result2.criteria);
+        store.setAiProvider('appel2', p2);
 
-      // Compute scores from Appel 2 defaults (pour chaque option)
-      const criteria = result2.criteria;
-      const weights: Record<string, number> = {};
-      const userScores: Record<string, Record<string, number>> = {};
-      for (const c of criteria) {
-        weights[c.id] = c.default_weight;
-        for (const [optId, score] of Object.entries(c.option_scores)) {
-          if (!userScores[optId]) userScores[optId] = {};
-          userScores[optId][c.id] = score;
+        const criteria = result2.criteria;
+        const weights: Record<string, number> = {};
+        const userScores: Record<string, Record<string, number>> = {};
+        for (const c of criteria) {
+          weights[c.id] = c.default_weight;
+          for (const [optId, score] of Object.entries(c.option_scores)) {
+            if (!userScores[optId]) userScores[optId] = {};
+            userScores[optId][c.id] = score;
+          }
         }
-      }
-      const totalPoids = criteria.reduce((sum, c) => sum + c.default_weight, 0);
-      const scores: Record<string, number> = {};
-      for (const opt of store.options) {
-        scores[opt.id] = totalPoids > 0
-          ? Math.round(criteria.reduce((sum, c) => sum + (c.option_scores[opt.id] ?? 5) * c.default_weight, 0) / totalPoids * 10)
-          : 0;
-      }
-      const sortedOpts = [...store.options].sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
-      const winner = sortedOpts[0]?.label ?? '';
-      const ecart = sortedOpts.length >= 2
-        ? (scores[sortedOpts[0].id] ?? 0) - (scores[sortedOpts[1].id] ?? 0)
-        : 100;
-      const labelNiveau = ecart < 5
-        ? 'Décision serrée — les options se valent'
-        : ecart < 15
-          ? `Légère préférence pour ${winner}`
-          : `Recommandation claire : ${winner}`;
+        const totalPoids = criteria.reduce((sum, c) => sum + c.default_weight, 0);
+        const scores: Record<string, number> = {};
+        for (const opt of store.options) {
+          scores[opt.id] = totalPoids > 0
+            ? Math.round(criteria.reduce((sum, c) => sum + (c.option_scores[opt.id] ?? 5) * c.default_weight, 0) / totalPoids * 10)
+            : 0;
+        }
+        const sortedOpts = [...store.options].sort((a, b) => (scores[b.id] ?? 0) - (scores[a.id] ?? 0));
+        const winner = sortedOpts[0]?.label ?? '';
+        const ecart = sortedOpts.length >= 2
+          ? (scores[sortedOpts[0].id] ?? 0) - (scores[sortedOpts[1].id] ?? 0)
+          : 100;
+        const labelNiveau = ecart < 5
+          ? 'Décision serrée — les options se valent'
+          : ecart < 15
+            ? `Légère préférence pour ${winner}`
+            : `Recommandation claire : ${winner}`;
 
-      store.computeScores();
+        store.computeScores();
 
-      // Appel 3 — analyse finale
-      const { data: result3, provider: p3 } = await callAppel3({
-        originalText: store.originalText,
-        options: store.options,
-        scores,
-        labelNiveau,
-        questions: store.questions,
-        answers: allAnswers,
-        criteria,
-        weights,
-        userScores,
-      });
-      store.setAnalysis(result3);
-      store.setAiProvider('appel3', p3);
+        // Appel 3 — analyse finale
+        const { data: result3, provider: p3 } = await callAppel3({
+          originalText: store.originalText,
+          options: store.options,
+          scores,
+          labelNiveau,
+          questions: store.questions,
+          answers: allAnswers,
+          criteria,
+          weights,
+          userScores,
+        });
+        store.setAnalysis(result3);
+        store.setAiProvider('appel3', p3);
+        aiDone = true;
+      })();
 
+      await showAd();
+
+      if (!aiDone) setShowLoader(true);
+
+      await aiPromise;
+
+      setShowLoader(false);
       router.push('/result');
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message ?? err?.message ?? 'Erreur inconnue';
@@ -364,6 +379,17 @@ export default function QuestionsScreen() {
   }
 
   return (
+    <>
+    <Modal visible={showLoader} transparent animationType="fade" statusBarTranslucent>
+      <View style={styles.loaderOverlay}>
+        <View style={styles.loaderLogo}>
+          <Text style={styles.loaderLogoText}>P1</Text>
+        </View>
+        <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 32 }} />
+        <Text style={styles.loaderTitle}>Analyse en cours…</Text>
+        <Text style={styles.loaderSub}>On croise les données, détecte les biais{'\n'}et prépare ta recommandation.</Text>
+      </View>
+    </Modal>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -445,6 +471,7 @@ export default function QuestionsScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </>
   );
 }
 
@@ -591,5 +618,40 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: Typography.fontSizeMD,
     fontWeight: Typography.fontWeightBold,
+  },
+  loaderOverlay: {
+    flex: 1,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing['2xl'],
+  },
+  loaderLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: Colors.textPrimary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loaderLogoText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700' as const,
+    letterSpacing: 0.5,
+  },
+  loaderTitle: {
+    marginTop: 20,
+    fontSize: Typography.fontSizeXL,
+    fontWeight: Typography.fontWeightBold,
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  loaderSub: {
+    marginTop: 10,
+    fontSize: Typography.fontSizeSM,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
   },
 });

@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import type { Session } from '@supabase/supabase-js';
 import { ToneSetupModal } from '@/components/ToneSetupModal';
 import * as Sentry from '@sentry/react-native';
+import MobileAds from 'react-native-google-mobile-ads';
 
 Sentry.init({
   dsn: 'https://c17d179ee8561e7733ee5db90cbcbe23@o4511275280760832.ingest.de.sentry.io/4511275309596752',
@@ -25,6 +26,10 @@ function RootLayout() {
   const [showToneModal, setShowToneModal] = useState(false);
   const router = useRouter();
   const segments = useSegments();
+
+  useEffect(() => {
+    MobileAds().initialize();
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
